@@ -8,10 +8,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { products } from "@/data/products";
 import { ShoppingCart, Heart, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { useCart } from "@/contexts/CartContext";
 
 const ProductDetail = () => {
   const { id } = useParams();
   const product = products.find((p) => p.id === id);
+  const { cart, addToCart, toggleWishlist, isInWishlist } = useCart();
   
   const [selectedSize, setSelectedSize] = useState<string>("");
   const [selectedColor, setSelectedColor] = useState<string>("");
@@ -19,7 +21,7 @@ const ProductDetail = () => {
   if (!product) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
+        <Header cartItemCount={cart.length} />
         <div className="container mx-auto px-4 py-16 text-center">
           <h1 className="text-2xl font-bold mb-4">Product not found</h1>
           <Link to="/shop">
@@ -44,12 +46,17 @@ const ProductDetail = () => {
       toast.error("Please select a color");
       return;
     }
-    toast.success(`${product.name} added to cart!`);
+    addToCart({
+      ...product,
+      quantity: 1,
+      selectedSize,
+      selectedColor,
+    });
   };
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      <Header cartItemCount={cart.length} />
       
       <div className="container mx-auto px-4 py-8">
         {/* Back Button */}
@@ -136,8 +143,13 @@ const ProductDetail = () => {
                 <ShoppingCart className="mr-2 h-5 w-5" />
                 Add to Cart
               </Button>
-              <Button variant="outline" size="lg">
-                <Heart className="h-5 w-5" />
+              <Button 
+                variant="outline" 
+                size="lg"
+                onClick={() => toggleWishlist(product.id)}
+                className={isInWishlist(product.id) ? "text-primary" : ""}
+              >
+                <Heart className={`h-5 w-5 ${isInWishlist(product.id) ? "fill-current" : ""}`} />
               </Button>
             </div>
 
