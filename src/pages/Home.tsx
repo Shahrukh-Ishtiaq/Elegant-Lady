@@ -3,15 +3,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { useCart } from "@/contexts/CartContext";
 import heroImage from "@/assets/hero-lingerie.jpg";
 import collectionBras from "@/assets/collection-bras.jpg";
 import collectionNightwear from "@/assets/collection-nightwear.jpg";
 import collectionLoungewear from "@/assets/collection-loungewear.jpg";
 
 const Home = () => {
+  const { cart } = useCart();
+  
   return (
     <div className="min-h-screen bg-gradient-soft">
-      <Header />
+      <Header cartItemCount={cart.length} />
       
       {/* Hero Section */}
       <section className="relative h-[600px] overflow-hidden">

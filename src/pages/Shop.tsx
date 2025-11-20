@@ -7,51 +7,88 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { products } from "@/data/products";
-import { ShoppingCart } from "lucide-react";
-import { toast } from "sonner";
+import { ShoppingCart, Heart } from "lucide-react";
+import { useCart } from "@/contexts/CartContext";
 
 const Shop = () => {
   const [searchParams] = useSearchParams();
   const categoryFilter = searchParams.get("category");
+  const searchQuery = searchParams.get("search");
+  const wishlistFilter = searchParams.get("filter");
   
   const [selectedCategory, setSelectedCategory] = useState<string>(categoryFilter || "all");
   const [selectedColor, setSelectedColor] = useState<string>("all");
   const [priceRange, setPriceRange] = useState<string>("all");
+  
+  const { cart, addToCart, toggleWishlist, isInWishlist, wishlist } = useCart();
 
   const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      if (selectedCategory !== "all" && product.category.toLowerCase() !== selectedCategory.toLowerCase()) {
-        return false;
-      }
-      
-      if (selectedColor !== "all" && !product.colors.some(c => c.toLowerCase().includes(selectedColor.toLowerCase()))) {
-        return false;
-      }
-      
-      if (priceRange !== "all") {
+    let filtered = products;
+    
+    // Wishlist filter
+    if (wishlistFilter === "wishlist") {
+      filtered = filtered.filter((product) => isInWishlist(product.id));
+    }
+    
+    // Search filter
+    if (searchQuery) {
+      filtered = filtered.filter((product) =>
+        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.category.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    
+    // Category filter
+    if (selectedCategory !== "all") {
+      filtered = filtered.filter((product) => 
+        product.category.toLowerCase() === selectedCategory.toLowerCase()
+      );
+    }
+    
+    // Color filter
+    if (selectedColor !== "all") {
+      filtered = filtered.filter((product) =>
+        product.colors.some(c => c.toLowerCase().includes(selectedColor.toLowerCase()))
+      );
+    }
+    
+    // Price filter
+    if (priceRange !== "all") {
+      filtered = filtered.filter((product) => {
         const price = product.price;
         if (priceRange === "under2000" && price >= 2000) return false;
         if (priceRange === "2000-3500" && (price < 2000 || price > 3500)) return false;
         if (priceRange === "over3500" && price <= 3500) return false;
-      }
-      
-      return true;
-    });
-  }, [selectedCategory, selectedColor, priceRange]);
+        return true;
+      });
+    }
+    
+    return filtered;
+  }, [selectedCategory, selectedColor, priceRange, searchQuery, wishlistFilter, wishlist, isInWishlist]);
 
-  const handleAddToCart = (productName: string) => {
-    toast.success(`${productName} added to cart!`);
+  const handleAddToCart = (product: typeof products[0]) => {
+    addToCart({
+      ...product,
+      quantity: 1,
+      selectedSize: product.sizes[0],
+      selectedColor: product.colors[0],
+    });
   };
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      <Header cartItemCount={cart.length} />
       
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">Shop All</h1>
-          <p className="text-muted-foreground">Discover your perfect pieces</p>
+          <h1 className="text-4xl font-bold mb-2">
+            {wishlistFilter === "wishlist" ? "My Wishlist" : searchQuery ? `Search results for "${searchQuery}"` : "Shop All"}
+          </h1>
+          <p className="text-muted-foreground">
+            {wishlistFilter === "wishlist" ? "Your favorite items" : "Discover your perfect pieces"}
+          </p>
         </div>
 
         {/* Filters */}
@@ -142,14 +179,22 @@ const Shop = () => {
                   <p className="text-lg font-bold text-primary">PKR {product.price.toLocaleString()}</p>
                 </Link>
               </CardContent>
-              <CardFooter className="p-4 pt-0">
+              <CardFooter className="p-4 pt-0 flex gap-2">
                 <Button 
-                  className="w-full" 
+                  className="flex-1" 
                   variant="default"
-                  onClick={() => handleAddToCart(product.name)}
+                  onClick={() => handleAddToCart(product)}
                 >
                   <ShoppingCart className="mr-2 h-4 w-4" />
                   Add to Cart
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => toggleWishlist(product.id)}
+                  className={isInWishlist(product.id) ? "text-primary" : ""}
+                >
+                  <Heart className={`h-4 w-4 ${isInWishlist(product.id) ? "fill-current" : ""}`} />
                 </Button>
               </CardFooter>
             </Card>
