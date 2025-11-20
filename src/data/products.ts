@@ -3,8 +3,13 @@ import bralette1 from "@/assets/products/bralette-1.jpg";
 import bra2 from "@/assets/products/bra-2.jpg";
 import bra3 from "@/assets/products/bra-3.jpg";
 import bra4 from "@/assets/products/bra-4.jpg";
+import bra5 from "@/assets/products/bra-5.jpg";
+import bra6 from "@/assets/products/bra-6.jpg";
 import panty1 from "@/assets/products/panty-1.jpg";
+import panty2 from "@/assets/products/panty-2.jpg";
 import nightwear1 from "@/assets/products/nightwear-1.jpg";
+import nightwear2 from "@/assets/products/nightwear-2.jpg";
+import bikini1 from "@/assets/products/bikini-1.jpg";
 import robe1 from "@/assets/products/robe-1.jpg";
 import loungewear1 from "@/assets/products/loungewear-1.jpg";
 import shapewear1 from "@/assets/products/shapewear-1.jpg";
@@ -112,22 +117,22 @@ export const products: Product[] = [
   },
   {
     id: "10",
-    name: "Comfort Bikini Brief",
+    name: "Lace Bikini Panty Set",
     category: "Panties",
-    price: 1550,
-    description: "Classic bikini brief with soft cotton lining. Perfect for everyday comfort.",
-    images: [bra4],
+    price: 2150,
+    description: "Elegant lace bikini panty with matching bralette. Perfect for a coordinated look.",
+    images: [panty2, panty1, lingerie3],
     sizes: ["XS", "S", "M", "L", "XL"],
     colors: ["White", "Blush", "Beige"],
     inStock: true,
   },
   {
     id: "11",
-    name: "Silk Chemise",
+    name: "Silk Chemise Nightwear",
     category: "Nightwear",
     price: 3850,
     description: "Flowing silk chemise with adjustable straps and lace trim at neckline.",
-    images: [nightwear1],
+    images: [nightwear2, nightwear1, robe1],
     sizes: ["XS", "S", "M", "L", "XL"],
     colors: ["Champagne", "Blush Pink", "Ivory"],
     inStock: true,
@@ -149,7 +154,7 @@ export const products: Product[] = [
     category: "Bras",
     price: 2899,
     description: "Push-up bra with lace overlay and removable padding for customizable lift.",
-    images: [bralette1],
+    images: [bra5, bra6, bralette1],
     sizes: ["XS", "S", "M", "L", "XL"],
     colors: ["Blush", "Black", "White"],
     inStock: true,
@@ -193,7 +198,7 @@ export const products: Product[] = [
     category: "Bras",
     price: 2650,
     description: "Medium-support sports bra with moisture-wicking fabric. Perfect for light workouts.",
-    images: [bra2],
+    images: [bra6, bra5, bra2],
     sizes: ["XS", "S", "M", "L", "XL"],
     colors: ["Blush", "Gray", "Black"],
     inStock: true,
@@ -277,11 +282,11 @@ export const products: Product[] = [
   },
   {
     id: "25",
-    name: "T-Shirt Bra",
+    name: "Seamless T-Shirt Bra",
     category: "Bras",
     price: 2750,
     description: "Seamless t-shirt bra with molded cups. Invisible under any outfit.",
-    images: [bralette1],
+    images: [bra6, bra4, bra3],
     sizes: ["XS", "S", "M", "L", "XL", "XXL"],
     colors: ["Nude", "White", "Black"],
     inStock: true,
@@ -332,13 +337,13 @@ export const products: Product[] = [
   },
   {
     id: "30",
-    name: "Satin Camisole",
-    category: "Loungewear",
-    price: 2450,
-    description: "Elegant satin camisole with lace trim. Layer or wear alone.",
-    images: [lingerie3],
+    name: "Lace Bikini Swimwear Set",
+    category: "Panties",
+    price: 3450,
+    description: "Elegant lace bikini set perfect for beach or intimate wear. Comfortable and stylish.",
+    images: [bikini1, panty2, lingerie3],
     sizes: ["XS", "S", "M", "L", "XL"],
-    colors: ["Champagne", "Blush Pink", "White"],
+    colors: ["Blush Pink", "Black", "White"],
     inStock: true,
   },
 ];

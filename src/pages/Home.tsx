@@ -24,7 +24,7 @@ const Home = () => {
           <div className="container mx-auto px-4">
             <div className="max-w-xl space-y-6">
               <h1 className="text-5xl md:text-6xl font-bold leading-tight">
-                Elegance that feels like love.
+                Seamless comfort anytime
               </h1>
               <p className="text-xl text-muted-foreground">
                 Discover comfort, confidence, and style in every piece.
