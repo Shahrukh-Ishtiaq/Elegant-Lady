@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { ShoppingCart, Heart, User, Search } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
+import logo from "@/assets/elegant-lady-logo.png";
 
 interface HeaderProps {
   cartItemCount?: number;
@@ -13,9 +14,10 @@ export const Header = ({ cartItemCount = 0 }: HeaderProps) => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
+          <Link to="/" className="flex items-center gap-3">
+            <img src={logo} alt="Elegant Lady" className="h-12 w-12 object-contain" />
             <h1 className="text-2xl md:text-3xl font-bold bg-gradient-romantic bg-clip-text text-transparent">
-              Lovabelle
+              Elegant Lady
             </h1>
           </Link>
 

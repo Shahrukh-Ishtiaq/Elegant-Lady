@@ -9,10 +9,10 @@ export const Footer = () => {
           {/* Brand */}
           <div className="space-y-4">
             <h3 className="text-xl font-bold bg-gradient-romantic bg-clip-text text-transparent">
-              Lovabelle
+              Elegant Lady
             </h3>
             <p className="text-sm text-muted-foreground">
-              Comfort that loves you back.
+              Seamless comfort anytime.
             </p>
             <div className="flex space-x-4">
               <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
@@ -106,7 +106,7 @@ export const Footer = () => {
 
         <div className="border-t border-border mt-8 pt-8 text-center">
           <p className="text-sm text-muted-foreground">
-            © 2025 Lovabelle Lingerie. All rights reserved.
+            © 2025 Elegant Lady. All rights reserved.
           </p>
         </div>
       </div>

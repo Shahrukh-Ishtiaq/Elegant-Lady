@@ -15,7 +15,10 @@ const Checkout = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Order placed successfully! You will receive a confirmation email.");
+    const paymentMsg = paymentMethod === "card" 
+      ? "Payment processed successfully! Order confirmed." 
+      : "Order placed successfully! You will receive a confirmation email.";
+    toast.success(paymentMsg);
     setTimeout(() => {
       navigate("/");
     }, 2000);
@@ -100,15 +103,58 @@ const Checkout = () => {
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2 p-4 border rounded-lg">
-                      <RadioGroupItem value="online" id="online" />
-                      <Label htmlFor="online" className="flex-1 cursor-pointer">
+                      <RadioGroupItem value="card" id="card" />
+                      <Label htmlFor="card" className="flex-1 cursor-pointer">
                         <div>
-                          <p className="font-semibold">Online Payment</p>
-                          <p className="text-sm text-muted-foreground">Credit/Debit Card or Bank Transfer</p>
+                          <p className="font-semibold">Credit/Debit Card</p>
+                          <p className="text-sm text-muted-foreground">Pay securely with your card</p>
                         </div>
                       </Label>
                     </div>
                   </RadioGroup>
+
+                  {paymentMethod === "card" && (
+                    <div className="mt-4 space-y-4 p-4 border rounded-lg bg-muted/30">
+                      <div className="space-y-2">
+                        <Label htmlFor="cardNumber">Card Number</Label>
+                        <Input 
+                          id="cardNumber" 
+                          placeholder="1234 5678 9012 3456"
+                          maxLength={19}
+                          required={paymentMethod === "card"}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="expiry">Expiry Date</Label>
+                          <Input 
+                            id="expiry" 
+                            placeholder="MM/YY"
+                            maxLength={5}
+                            required={paymentMethod === "card"}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="cvv">CVV</Label>
+                          <Input 
+                            id="cvv" 
+                            placeholder="123"
+                            maxLength={4}
+                            type="password"
+                            required={paymentMethod === "card"}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="cardName">Cardholder Name</Label>
+                        <Input 
+                          id="cardName" 
+                          placeholder="Name on card"
+                          required={paymentMethod === "card"}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
