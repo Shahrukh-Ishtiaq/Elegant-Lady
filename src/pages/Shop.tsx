@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { products } from "@/data/products";
 import { ShoppingCart, Heart } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
+import { StarRating } from "@/components/StarRating";
 
 const Shop = () => {
   const [searchParams] = useSearchParams();
@@ -19,6 +20,7 @@ const Shop = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>(categoryFilter || "all");
   const [selectedColor, setSelectedColor] = useState<string>("all");
   const [priceRange, setPriceRange] = useState<string>("all");
+  const [ratingFilter, setRatingFilter] = useState<string>("all");
   
   const { cart, addToCart, toggleWishlist, isInWishlist, wishlist } = useCart();
 
@@ -63,9 +65,15 @@ const Shop = () => {
         return true;
       });
     }
+
+    // Rating filter
+    if (ratingFilter !== "all") {
+      const minRating = parseFloat(ratingFilter);
+      filtered = filtered.filter((product) => product.rating >= minRating);
+    }
     
     return filtered;
-  }, [selectedCategory, selectedColor, priceRange, searchQuery, wishlistFilter, wishlist, isInWishlist]);
+  }, [selectedCategory, selectedColor, priceRange, ratingFilter, searchQuery, wishlistFilter, wishlist, isInWishlist]);
 
   const handleAddToCart = (product: typeof products[0]) => {
     addToCart({
@@ -75,6 +83,15 @@ const Shop = () => {
       selectedColor: product.colors[0],
     });
   };
+
+  const clearAllFilters = () => {
+    setSelectedCategory("all");
+    setSelectedColor("all");
+    setPriceRange("all");
+    setRatingFilter("all");
+  };
+
+  const hasActiveFilters = selectedCategory !== "all" || selectedColor !== "all" || priceRange !== "all" || ratingFilter !== "all";
 
   return (
     <div className="min-h-screen bg-background">
@@ -133,14 +150,23 @@ const Shop = () => {
             </SelectContent>
           </Select>
 
-          {(selectedCategory !== "all" || selectedColor !== "all" || priceRange !== "all") && (
+          <Select value={ratingFilter} onValueChange={setRatingFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Rating" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Ratings</SelectItem>
+              <SelectItem value="4.5">4.5+ Stars</SelectItem>
+              <SelectItem value="4">4+ Stars</SelectItem>
+              <SelectItem value="3.5">3.5+ Stars</SelectItem>
+              <SelectItem value="3">3+ Stars</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {hasActiveFilters && (
             <Button 
               variant="ghost" 
-              onClick={() => {
-                setSelectedCategory("all");
-                setSelectedColor("all");
-                setPriceRange("all");
-              }}
+              onClick={clearAllFilters}
             >
               Clear Filters
             </Button>
@@ -176,6 +202,10 @@ const Shop = () => {
                   <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">
                     {product.name}
                   </h3>
+                  <div className="flex items-center gap-2 mb-2">
+                    <StarRating rating={product.rating} size="sm" />
+                    <span className="text-xs text-muted-foreground">({product.reviewCount})</span>
+                  </div>
                   <p className="text-lg font-bold text-primary">PKR {product.price.toLocaleString()}</p>
                 </Link>
               </CardContent>
@@ -207,11 +237,7 @@ const Shop = () => {
             <Button 
               variant="default" 
               className="mt-4"
-              onClick={() => {
-                setSelectedCategory("all");
-                setSelectedColor("all");
-                setPriceRange("all");
-              }}
+              onClick={clearAllFilters}
             >
               Clear All Filters
             </Button>

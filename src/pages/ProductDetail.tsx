@@ -9,6 +9,8 @@ import { products } from "@/data/products";
 import { ShoppingCart, Heart, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useCart } from "@/contexts/CartContext";
+import { StarRating } from "@/components/StarRating";
+import { ProductReviews } from "@/components/ProductReviews";
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -17,6 +19,7 @@ const ProductDetail = () => {
   
   const [selectedSize, setSelectedSize] = useState<string>("");
   const [selectedColor, setSelectedColor] = useState<string>("");
+  const [selectedImage, setSelectedImage] = useState(0);
   
   if (!product) {
     return (
@@ -70,20 +73,26 @@ const ProductDetail = () => {
           <div className="space-y-4">
             <div className="aspect-[3/4] overflow-hidden rounded-xl bg-muted shadow-soft">
               <img 
-                src={product.images[0]} 
+                src={product.images[selectedImage]} 
                 alt={product.name}
                 className="w-full h-full object-cover"
               />
             </div>
             <div className="grid grid-cols-4 gap-4">
-              {[...product.images, ...product.images, ...product.images].slice(0, 4).map((img, idx) => (
-                <div key={idx} className="aspect-square overflow-hidden rounded-lg bg-muted border-2 border-transparent hover:border-primary transition-colors cursor-pointer">
+              {product.images.map((img, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setSelectedImage(idx)}
+                  className={`aspect-square overflow-hidden rounded-lg bg-muted border-2 transition-colors cursor-pointer ${
+                    selectedImage === idx ? "border-primary" : "border-transparent hover:border-primary/50"
+                  }`}
+                >
                   <img 
                     src={img} 
                     alt={`${product.name} view ${idx + 1}`}
                     className="w-full h-full object-cover"
                   />
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -93,6 +102,12 @@ const ProductDetail = () => {
             <div>
               <Badge variant="secondary" className="mb-2">{product.category}</Badge>
               <h1 className="text-4xl font-bold mb-2">{product.name}</h1>
+              <div className="flex items-center gap-3 mb-2">
+                <StarRating rating={product.rating} size="md" showValue />
+                <span className="text-sm text-muted-foreground">
+                  ({product.reviewCount} reviews)
+                </span>
+              </div>
               <p className="text-3xl font-bold text-primary">PKR {product.price.toLocaleString()}</p>
             </div>
 
@@ -175,6 +190,16 @@ const ProductDetail = () => {
           </div>
         </div>
 
+        {/* Reviews Section */}
+        <div className="mt-16">
+          <h2 className="text-3xl font-bold mb-8">Customer Reviews</h2>
+          <ProductReviews 
+            productId={product.id} 
+            productRating={product.rating} 
+            reviewCount={product.reviewCount} 
+          />
+        </div>
+
         {/* Related Products */}
         {relatedProducts.length > 0 && (
           <div className="mt-20">
@@ -192,6 +217,10 @@ const ProductDetail = () => {
                     </div>
                     <CardContent className="p-4">
                       <h3 className="font-semibold mb-1">{relatedProduct.name}</h3>
+                      <div className="flex items-center gap-2 mb-1">
+                        <StarRating rating={relatedProduct.rating} size="sm" />
+                        <span className="text-xs text-muted-foreground">({relatedProduct.reviewCount})</span>
+                      </div>
                       <p className="text-lg font-bold text-primary">
                         PKR {relatedProduct.price.toLocaleString()}
                       </p>
