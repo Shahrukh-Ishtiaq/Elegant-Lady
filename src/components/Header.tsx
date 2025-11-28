@@ -1,11 +1,14 @@
 import { Link, useNavigate } from "react-router-dom";
-import { ShoppingCart, Heart, User, Search } from "lucide-react";
+import { ShoppingCart, Heart, User, Search, Menu, LogOut, Shield } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "./ui/sheet";
 import logo from "@/assets/elegant-lady-logo.png";
 import { useState } from "react";
 import { useCart } from "@/contexts/CartContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 interface HeaderProps {
   cartItemCount?: number;
@@ -14,8 +17,10 @@ interface HeaderProps {
 export const Header = ({ cartItemCount }: HeaderProps) => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const { cart, wishlist } = useCart();
+  const { user, isAdmin, signOut } = useAuth();
   
   const displayCartCount = cartItemCount !== undefined ? cartItemCount : cart.length;
 
@@ -27,36 +32,119 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
       setSearchQuery("");
     }
   };
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast.success("Signed out successfully");
+    navigate("/");
+    setMobileMenuOpen(false);
+  };
+
+  const navLinks = [
+    { to: "/", label: "Home" },
+    { to: "/shop", label: "Shop" },
+    { to: "/about", label: "About" },
+    { to: "/contact", label: "Contact" },
+  ];
+
   return (
     <header className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-20">
+          {/* Mobile Menu */}
+          <div className="md:hidden">
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-6 w-6" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[280px]">
+                <SheetHeader>
+                  <SheetTitle>
+                    <Link to="/" onClick={() => setMobileMenuOpen(false)}>
+                      <img src={logo} alt="Elegant Lady" className="h-12 w-auto" />
+                    </Link>
+                  </SheetTitle>
+                </SheetHeader>
+                <nav className="flex flex-col gap-4 mt-8">
+                  {navLinks.map((link) => (
+                    <Link
+                      key={link.to}
+                      to={link.to}
+                      className="text-lg font-medium hover:text-primary transition-colors py-2"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                  
+                  {isAdmin && (
+                    <Link
+                      to="/admin"
+                      className="text-lg font-medium hover:text-primary transition-colors py-2 flex items-center gap-2"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Shield className="h-4 w-4" />
+                      Admin Dashboard
+                    </Link>
+                  )}
+                  
+                  <div className="border-t pt-4 mt-4">
+                    {user ? (
+                      <div className="space-y-4">
+                        <p className="text-sm text-muted-foreground">
+                          Signed in as {user.email}
+                        </p>
+                        <Button 
+                          variant="outline" 
+                          className="w-full justify-start"
+                          onClick={handleSignOut}
+                        >
+                          <LogOut className="mr-2 h-4 w-4" />
+                          Sign Out
+                        </Button>
+                      </div>
+                    ) : (
+                      <Link to="/auth" onClick={() => setMobileMenuOpen(false)}>
+                        <Button variant="outline" className="w-full">
+                          <User className="mr-2 h-4 w-4" />
+                          Sign In / Sign Up
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                </nav>
+              </SheetContent>
+            </Sheet>
+          </div>
+
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3">
-            <img src={logo} alt="Elegant Lady" className="h-16 w-auto object-contain" />
+            <img src={logo} alt="Elegant Lady" className="h-12 md:h-16 w-auto object-contain" />
           </Link>
 
-          {/* Navigation */}
+          {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
-            <Link to="/" className="text-sm font-medium hover:text-primary transition-colors">
-              Home
-            </Link>
-            <Link to="/shop" className="text-sm font-medium hover:text-primary transition-colors">
-              Shop
-            </Link>
-            <Link to="/about" className="text-sm font-medium hover:text-primary transition-colors">
-              About
-            </Link>
-            <Link to="/contact" className="text-sm font-medium hover:text-primary transition-colors">
-              Contact
-            </Link>
-            <Link to="/admin" className="text-sm font-medium hover:text-primary transition-colors">
-              Admin
-            </Link>
+            {navLinks.map((link) => (
+              <Link 
+                key={link.to}
+                to={link.to} 
+                className="text-sm font-medium hover:text-primary transition-colors"
+              >
+                {link.label}
+              </Link>
+            ))}
+            {isAdmin && (
+              <Link to="/admin" className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-1">
+                <Shield className="h-4 w-4" />
+                Admin
+              </Link>
+            )}
           </nav>
 
           {/* Actions */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1 md:space-x-2">
             {searchOpen ? (
               <form onSubmit={handleSearch} className="flex items-center gap-2">
                 <Input
@@ -64,7 +152,7 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
                   placeholder="Search products..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-48 md:w-64"
+                  className="w-32 md:w-64"
                   autoFocus
                 />
                 <Button type="button" variant="ghost" size="icon" onClick={() => setSearchOpen(false)}>
@@ -76,11 +164,22 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
                 <Button variant="ghost" size="icon" onClick={() => setSearchOpen(true)}>
                   <Search className="h-5 w-5" />
                 </Button>
-                <Link to="/auth">
-                  <Button variant="ghost" size="icon">
-                    <User className="h-5 w-5" />
-                  </Button>
-                </Link>
+                
+                {/* Desktop Auth */}
+                <div className="hidden md:flex items-center">
+                  {user ? (
+                    <Button variant="ghost" size="icon" onClick={handleSignOut} title="Sign Out">
+                      <LogOut className="h-5 w-5" />
+                    </Button>
+                  ) : (
+                    <Link to="/auth">
+                      <Button variant="ghost" size="icon">
+                        <User className="h-5 w-5" />
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+                
                 <Link to="/shop?filter=wishlist">
                   <Button variant="ghost" size="icon" className="relative">
                     <Heart className="h-5 w-5" />
