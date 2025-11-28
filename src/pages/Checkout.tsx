@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -8,30 +8,124 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
+import { useCart } from "@/contexts/CartContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { ShoppingBag, Loader2 } from "lucide-react";
 
 const Checkout = () => {
   const navigate = useNavigate();
+  const { cart, clearCart } = useCart();
+  const { user } = useAuth();
   const [paymentMethod, setPaymentMethod] = useState("cod");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: user?.email || "",
+    phone: "",
+    address: "",
+    city: "",
+    state: "",
+    zip: "",
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const paymentMsg = paymentMethod === "card" 
-      ? "Payment processed successfully! Order confirmed." 
-      : "Order placed successfully! You will receive a confirmation email.";
-    toast.success(paymentMsg);
-    setTimeout(() => {
-      navigate("/");
-    }, 2000);
+  // Calculate totals from cart
+  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const shipping = subtotal > 5000 ? 0 : 250;
+  const total = subtotal + shipping;
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    setFormData(prev => ({ ...prev, [id]: value }));
   };
 
-  const total = 6449; // Mock total
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (cart.length === 0) {
+      toast.error("Your cart is empty");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Create order in database
+      const orderData = {
+        user_id: user?.id || null,
+        status: "pending",
+        total: total,
+        shipping_address: {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          zip: formData.zip,
+        },
+        payment_method: paymentMethod,
+        items: cart.map(item => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          selectedSize: item.selectedSize,
+          selectedColor: item.selectedColor,
+          image: item.images[0],
+        })),
+      };
+
+      const { error } = await supabase.from("orders").insert(orderData);
+
+      if (error) throw error;
+
+      const paymentMsg = paymentMethod === "card" 
+        ? "Payment processed successfully! Order confirmed." 
+        : "Order placed successfully! You will receive a confirmation email.";
+      
+      toast.success(paymentMsg);
+      clearCart();
+      
+      setTimeout(() => {
+        navigate("/");
+      }, 2000);
+    } catch (error) {
+      console.error("Order error:", error);
+      toast.error("Failed to place order. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (cart.length === 0) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container mx-auto px-4 py-16">
+          <div className="text-center space-y-6">
+            <ShoppingBag className="h-24 w-24 mx-auto text-muted-foreground" />
+            <h2 className="text-3xl font-bold">Your cart is empty</h2>
+            <p className="text-muted-foreground">Add items to your cart before checkout.</p>
+            <Link to="/shop">
+              <Button variant="default" size="lg">Browse Products</Button>
+            </Link>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
       
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-4xl font-bold mb-8">Checkout</h1>
+        <h1 className="text-3xl md:text-4xl font-bold mb-8">Checkout</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Checkout Form */}
@@ -46,41 +140,91 @@ const Checkout = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="firstName">First Name</Label>
-                      <Input id="firstName" required />
+                      <Input 
+                        id="firstName" 
+                        value={formData.firstName}
+                        onChange={handleInputChange}
+                        required 
+                        disabled={isSubmitting}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="lastName">Last Name</Label>
-                      <Input id="lastName" required />
+                      <Input 
+                        id="lastName" 
+                        value={formData.lastName}
+                        onChange={handleInputChange}
+                        required 
+                        disabled={isSubmitting}
+                      />
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" required />
+                    <Input 
+                      id="email" 
+                      type="email" 
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      required 
+                      disabled={isSubmitting}
+                    />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="phone">Phone Number</Label>
-                    <Input id="phone" type="tel" required />
+                    <Input 
+                      id="phone" 
+                      type="tel" 
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      required 
+                      disabled={isSubmitting}
+                    />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="address">Address</Label>
-                    <Input id="address" required />
+                    <Input 
+                      id="address" 
+                      value={formData.address}
+                      onChange={handleInputChange}
+                      required 
+                      disabled={isSubmitting}
+                    />
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="city">City</Label>
-                      <Input id="city" required />
+                      <Input 
+                        id="city" 
+                        value={formData.city}
+                        onChange={handleInputChange}
+                        required 
+                        disabled={isSubmitting}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="state">State/Province</Label>
-                      <Input id="state" required />
+                      <Input 
+                        id="state" 
+                        value={formData.state}
+                        onChange={handleInputChange}
+                        required 
+                        disabled={isSubmitting}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="zip">Postal Code</Label>
-                      <Input id="zip" required />
+                      <Input 
+                        id="zip" 
+                        value={formData.zip}
+                        onChange={handleInputChange}
+                        required 
+                        disabled={isSubmitting}
+                      />
                     </div>
                   </div>
                 </CardContent>
@@ -94,7 +238,7 @@ const Checkout = () => {
                 <CardContent>
                   <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
                     <div className="flex items-center space-x-2 p-4 border rounded-lg">
-                      <RadioGroupItem value="cod" id="cod" />
+                      <RadioGroupItem value="cod" id="cod" disabled={isSubmitting} />
                       <Label htmlFor="cod" className="flex-1 cursor-pointer">
                         <div>
                           <p className="font-semibold">Cash on Delivery</p>
@@ -103,7 +247,7 @@ const Checkout = () => {
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2 p-4 border rounded-lg">
-                      <RadioGroupItem value="card" id="card" />
+                      <RadioGroupItem value="card" id="card" disabled={isSubmitting} />
                       <Label htmlFor="card" className="flex-1 cursor-pointer">
                         <div>
                           <p className="font-semibold">Credit/Debit Card</p>
@@ -122,6 +266,7 @@ const Checkout = () => {
                           placeholder="1234 5678 9012 3456"
                           maxLength={19}
                           required={paymentMethod === "card"}
+                          disabled={isSubmitting}
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
@@ -132,6 +277,7 @@ const Checkout = () => {
                             placeholder="MM/YY"
                             maxLength={5}
                             required={paymentMethod === "card"}
+                            disabled={isSubmitting}
                           />
                         </div>
                         <div className="space-y-2">
@@ -142,6 +288,7 @@ const Checkout = () => {
                             maxLength={4}
                             type="password"
                             required={paymentMethod === "card"}
+                            disabled={isSubmitting}
                           />
                         </div>
                       </div>
@@ -151,6 +298,7 @@ const Checkout = () => {
                           id="cardName" 
                           placeholder="Name on card"
                           required={paymentMethod === "card"}
+                          disabled={isSubmitting}
                         />
                       </div>
                     </div>
@@ -158,8 +306,15 @@ const Checkout = () => {
                 </CardContent>
               </Card>
 
-              <Button type="submit" className="w-full" size="lg">
-                Place Order
+              <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  `Place Order - PKR ${total.toLocaleString()}`
+                )}
               </Button>
             </form>
           </div>
@@ -171,18 +326,38 @@ const Checkout = () => {
                 <CardTitle>Order Summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
+                {/* Cart Items */}
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {cart.map((item, index) => (
+                    <div key={`${item.id}-${index}`} className="flex gap-3">
+                      <img 
+                        src={item.images[0]} 
+                        alt={item.name} 
+                        className="w-16 h-16 object-cover rounded"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.selectedSize} / {item.selectedColor} × {item.quantity}
+                        </p>
+                        <p className="text-sm font-semibold">
+                          PKR {(item.price * item.quantity).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t pt-4 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span>PKR 6,449</span>
+                    <span>PKR {subtotal.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Shipping</span>
-                    <span className="text-green-600">Free</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Tax</span>
-                    <span>PKR 0</span>
+                    <span className={shipping === 0 ? "text-green-600" : ""}>
+                      {shipping === 0 ? "Free" : `PKR ${shipping}`}
+                    </span>
                   </div>
                 </div>
 
