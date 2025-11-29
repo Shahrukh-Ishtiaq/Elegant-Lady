@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Instagram, Facebook, Heart } from "lucide-react";
+import elegantLadyLogo from "@/assets/elegant-lady-logo-gold.png";
 
 export const Footer = () => {
   return (
@@ -8,13 +9,22 @@ export const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="space-y-4">
-            <h3 className="text-xl font-bold bg-gradient-romantic bg-clip-text text-transparent">
-              Elegant Lady
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              Seamless comfort anytime.
-            </p>
-            <div className="flex space-x-4">
+            <div className="flex items-center gap-3">
+              <img 
+                src={elegantLadyLogo} 
+                alt="Elegant Lady Logo" 
+                className="h-12 w-12 md:h-16 md:w-16 object-contain"
+              />
+              <div>
+                <h3 className="text-2xl md:text-3xl font-display font-bold text-primary drop-shadow-sm">
+                  Elegant Lady
+                </h3>
+                <p className="text-xs md:text-sm text-muted-foreground italic">
+                  Seamless comfort anytime.
+                </p>
+              </div>
+            </div>
+            <div className="flex space-x-4 pt-2">
               <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
                 <Instagram className="h-5 w-5" />
               </a>
@@ -106,7 +116,7 @@ export const Footer = () => {
 
         <div className="border-t border-border mt-8 pt-8 text-center">
           <p className="text-sm text-muted-foreground">
-            © 2025 Elegant Lady. All rights reserved.
+            © 2025 <span className="font-semibold text-primary">Elegant Lady</span>. All rights reserved.
           </p>
         </div>
       </div>
