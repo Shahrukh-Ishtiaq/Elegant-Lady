@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -6,10 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { products } from "@/data/products";
-import { ShoppingCart, Heart } from "lucide-react";
+import { ShoppingCart, Heart, Loader2 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { StarRating } from "@/components/StarRating";
+
+const PRODUCTS_PER_PAGE = 8;
 
 const Shop = () => {
   const [searchParams] = useSearchParams();
@@ -21,7 +24,10 @@ const Shop = () => {
   const [selectedColor, setSelectedColor] = useState<string>("all");
   const [priceRange, setPriceRange] = useState<string>("all");
   const [ratingFilter, setRatingFilter] = useState<string>("all");
+  const [displayCount, setDisplayCount] = useState(PRODUCTS_PER_PAGE);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   
+  const loadMoreRef = useRef<HTMLDivElement>(null);
   const { cart, addToCart, toggleWishlist, isInWishlist, wishlist } = useCart();
 
   const filteredProducts = useMemo(() => {
@@ -74,6 +80,46 @@ const Shop = () => {
     
     return filtered;
   }, [selectedCategory, selectedColor, priceRange, ratingFilter, searchQuery, wishlistFilter, wishlist, isInWishlist]);
+
+  // Reset display count when filters change
+  useEffect(() => {
+    setDisplayCount(PRODUCTS_PER_PAGE);
+  }, [selectedCategory, selectedColor, priceRange, ratingFilter, searchQuery, wishlistFilter]);
+
+  const displayedProducts = useMemo(() => {
+    return filteredProducts.slice(0, displayCount);
+  }, [filteredProducts, displayCount]);
+
+  const hasMoreProducts = displayCount < filteredProducts.length;
+
+  const loadMore = useCallback(() => {
+    if (isLoadingMore || !hasMoreProducts) return;
+    
+    setIsLoadingMore(true);
+    // Simulate loading delay for better UX
+    setTimeout(() => {
+      setDisplayCount(prev => Math.min(prev + PRODUCTS_PER_PAGE, filteredProducts.length));
+      setIsLoadingMore(false);
+    }, 500);
+  }, [isLoadingMore, hasMoreProducts, filteredProducts.length]);
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMoreProducts && !isLoadingMore) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1, rootMargin: "100px" }
+    );
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [loadMore, hasMoreProducts, isLoadingMore]);
 
   const handleAddToCart = (product: typeof products[0]) => {
     addToCart({
@@ -176,13 +222,13 @@ const Shop = () => {
         {/* Products Count */}
         <div className="mb-6">
           <p className="text-muted-foreground">
-            Showing {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
+            Showing {displayedProducts.length} of {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
           </p>
         </div>
 
         {/* Products Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredProducts.map((product) => (
+          {displayedProducts.map((product) => (
             <Card key={product.id} className="border-none shadow-soft hover:shadow-elegant transition-all group">
               <Link to={`/product/${product.id}`}>
                 <div className="relative overflow-hidden rounded-t-lg aspect-[3/4] bg-muted">
@@ -190,6 +236,7 @@ const Shop = () => {
                     src={product.images[0]} 
                     alt={product.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    loading="lazy"
                   />
                   {product.inStock && (
                     <Badge className="absolute top-4 right-4 bg-accent">New</Badge>
@@ -230,6 +277,26 @@ const Shop = () => {
             </Card>
           ))}
         </div>
+
+        {/* Loading More Indicator */}
+        {hasMoreProducts && (
+          <div ref={loadMoreRef} className="flex justify-center py-8">
+            {isLoadingMore ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span>Loading more products...</span>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-4">
+                <div className="grid grid-cols-4 gap-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <Skeleton key={i} className="h-48 w-full rounded-lg" />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {filteredProducts.length === 0 && (
           <div className="text-center py-16">

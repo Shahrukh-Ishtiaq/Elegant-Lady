@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { ShoppingCart, Heart, User, Search, Menu, LogOut, Shield } from "lucide-react";
+import { ShoppingCart, Heart, User, Search, Menu, LogOut, Shield, Package } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
@@ -96,6 +96,12 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
                         <p className="text-sm text-muted-foreground">
                           Signed in as {user.email}
                         </p>
+                        <Link to="/my-orders" onClick={() => setMobileMenuOpen(false)}>
+                          <Button variant="outline" className="w-full justify-start mb-2">
+                            <Package className="mr-2 h-4 w-4" />
+                            My Orders
+                          </Button>
+                        </Link>
                         <Button 
                           variant="outline" 
                           className="w-full justify-start"
@@ -166,14 +172,21 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
                 </Button>
                 
                 {/* Desktop Auth */}
-                <div className="hidden md:flex items-center">
+                <div className="hidden md:flex items-center gap-1">
                   {user ? (
-                    <Button variant="ghost" size="icon" onClick={handleSignOut} title="Sign Out">
-                      <LogOut className="h-5 w-5" />
-                    </Button>
+                    <>
+                      <Link to="/my-orders">
+                        <Button variant="ghost" size="icon" title="My Orders">
+                          <Package className="h-5 w-5" />
+                        </Button>
+                      </Link>
+                      <Button variant="ghost" size="icon" onClick={handleSignOut} title="Sign Out">
+                        <LogOut className="h-5 w-5" />
+                      </Button>
+                    </>
                   ) : (
                     <Link to="/auth">
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" title="Sign In">
                         <User className="h-5 w-5" />
                       </Button>
                     </Link>
