@@ -1,10 +1,24 @@
 import { Link, useNavigate } from "react-router-dom";
-import { ShoppingCart, Heart, User, Search, Menu, LogOut, Shield, Package } from "lucide-react";
+import {
+  ShoppingCart,
+  Heart,
+  User,
+  Search,
+  Menu,
+  LogOut,
+  Shield,
+  Package,
+} from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "./ui/sheet";
-import logo from "@/assets/elegant-lady-logo.png";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetHeader,
+  SheetTitle,
+} from "./ui/sheet";
 import { useState } from "react";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,8 +35,9 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
   const navigate = useNavigate();
   const { cart, wishlist } = useCart();
   const { user, isAdmin, signOut } = useAuth();
-  
-  const displayCartCount = cartItemCount !== undefined ? cartItemCount : cart.length;
+
+  const displayCartCount =
+    cartItemCount !== undefined ? cartItemCount : cart.length;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +66,7 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
     <header className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-20">
-          {/* Mobile Menu */}
+          {/* MOBILE MENU BUTTON */}
           <div className="md:hidden">
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
@@ -62,11 +77,23 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
               <SheetContent side="left" className="w-[280px]">
                 <SheetHeader>
                   <SheetTitle>
-                    <Link to="/" onClick={() => setMobileMenuOpen(false)}>
-                      <img src={logo} alt="Elegant Lady" className="h-12 w-auto" />
+                    <Link
+                      to="/"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex flex-col items-center"
+                    >
+                      <img
+                        src="/ladylogo.png"
+                        alt="Elegant Lady"
+                        className=" w-auto object-contain"
+                      />
+                      <span className="-mt-20 text-lg font-semibold">
+                        Elegant Lady
+                      </span>
                     </Link>
                   </SheetTitle>
                 </SheetHeader>
+
                 <nav className="flex flex-col gap-4 mt-8">
                   {navLinks.map((link) => (
                     <Link
@@ -78,7 +105,7 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
                       {link.label}
                     </Link>
                   ))}
-                  
+
                   {isAdmin && (
                     <Link
                       to="/admin"
@@ -89,21 +116,27 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
                       Admin Dashboard
                     </Link>
                   )}
-                  
+
                   <div className="border-t pt-4 mt-4">
                     {user ? (
                       <div className="space-y-4">
                         <p className="text-sm text-muted-foreground">
                           Signed in as {user.email}
                         </p>
-                        <Link to="/my-orders" onClick={() => setMobileMenuOpen(false)}>
-                          <Button variant="outline" className="w-full justify-start mb-2">
+                        <Link
+                          to="/my-orders"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start mb-2"
+                          >
                             <Package className="mr-2 h-4 w-4" />
                             My Orders
                           </Button>
                         </Link>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           className="w-full justify-start"
                           onClick={handleSignOut}
                         >
@@ -125,31 +158,48 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
             </Sheet>
           </div>
 
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-3">
-            <img src={logo} alt="Elegant Lady" className="h-12 md:h-16 w-auto object-contain" />
-          </Link>
+          {/* LOGO + TEXT (DESKTOP LEFT, MOBILE CENTER) */}
+          <div className="relative flex items-center h-20 pl-4">
+            {/* BIG OVERLAPPING LOGO */}
+            <Link to="/" className="block">
+              <img
+                src="/ladylogo.png"
+                alt="Elegant Lady"
+                className="
+        h-28 w-auto object-contain
+        absolute -bottom-8 -left-8
+        z-30
+      "
+              />
+            </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
+            {/* TEXT — aligned beside logo */}
+            <span className="font-semibold text-xl ml-10">Elegant Lady</span>
+          </div>
+
+          {/* DESKTOP NAVIGATION */}
+          <nav className="hidden md:flex items-center space-x-8 absolute left-1/2 -translate-x-1/2">
             {navLinks.map((link) => (
-              <Link 
+              <Link
                 key={link.to}
-                to={link.to} 
+                to={link.to}
                 className="text-sm font-medium hover:text-primary transition-colors"
               >
                 {link.label}
               </Link>
             ))}
             {isAdmin && (
-              <Link to="/admin" className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-1">
+              <Link
+                to="/admin"
+                className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-1"
+              >
                 <Shield className="h-4 w-4" />
                 Admin
               </Link>
             )}
           </nav>
 
-          {/* Actions */}
+          {/* ACTIONS */}
           <div className="flex items-center space-x-1 md:space-x-2">
             {searchOpen ? (
               <form onSubmit={handleSearch} className="flex items-center gap-2">
@@ -161,17 +211,25 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
                   className="w-32 md:w-64"
                   autoFocus
                 />
-                <Button type="button" variant="ghost" size="icon" onClick={() => setSearchOpen(false)}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSearchOpen(false)}
+                >
                   ✕
                 </Button>
               </form>
             ) : (
               <>
-                <Button variant="ghost" size="icon" onClick={() => setSearchOpen(true)}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSearchOpen(true)}
+                >
                   <Search className="h-5 w-5" />
                 </Button>
-                
-                {/* Desktop Auth */}
+
                 <div className="hidden md:flex items-center gap-1">
                   {user ? (
                     <>
@@ -180,7 +238,12 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
                           <Package className="h-5 w-5" />
                         </Button>
                       </Link>
-                      <Button variant="ghost" size="icon" onClick={handleSignOut} title="Sign Out">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleSignOut}
+                        title="Sign Out"
+                      >
                         <LogOut className="h-5 w-5" />
                       </Button>
                     </>
@@ -192,7 +255,7 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
                     </Link>
                   )}
                 </div>
-                
+
                 <Link to="/shop?filter=wishlist">
                   <Button variant="ghost" size="icon" className="relative">
                     <Heart className="h-5 w-5" />
@@ -203,6 +266,7 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
                     )}
                   </Button>
                 </Link>
+
                 <Link to="/cart">
                   <Button variant="ghost" size="icon" className="relative">
                     <ShoppingCart className="h-5 w-5" />
