@@ -7,7 +7,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { products } from "@/data/products";
+import { useProducts } from "@/hooks/useProducts";
 import { ShoppingCart, Heart, Loader2 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { StarRating } from "@/components/StarRating";
@@ -29,6 +29,7 @@ const Shop = () => {
   
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const { cart, addToCart, toggleWishlist, isInWishlist, wishlist } = useCart();
+  const { products, loading: productsLoading } = useProducts();
 
   const filteredProducts = useMemo(() => {
     let filtered = products;
@@ -79,7 +80,7 @@ const Shop = () => {
     }
     
     return filtered;
-  }, [selectedCategory, selectedColor, priceRange, ratingFilter, searchQuery, wishlistFilter, wishlist, isInWishlist]);
+  }, [products, selectedCategory, selectedColor, priceRange, ratingFilter, searchQuery, wishlistFilter, wishlist, isInWishlist]);
 
   // Reset display count when filters change
   useEffect(() => {
@@ -96,7 +97,6 @@ const Shop = () => {
     if (isLoadingMore || !hasMoreProducts) return;
     
     setIsLoadingMore(true);
-    // Simulate loading delay for better UX
     setTimeout(() => {
       setDisplayCount(prev => Math.min(prev + PRODUCTS_PER_PAGE, filteredProducts.length));
       setIsLoadingMore(false);
@@ -125,8 +125,8 @@ const Shop = () => {
     addToCart({
       ...product,
       quantity: 1,
-      selectedSize: product.sizes[0],
-      selectedColor: product.colors[0],
+      selectedSize: product.sizes[0] || "",
+      selectedColor: product.colors[0] || "",
     });
   };
 
@@ -138,6 +138,22 @@ const Shop = () => {
   };
 
   const hasActiveFilters = selectedCategory !== "all" || selectedColor !== "all" || priceRange !== "all" || ratingFilter !== "all";
+
+  if (productsLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header cartItemCount={cart.length} />
+        <div className="container mx-auto px-4 py-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[...Array(8)].map((_, i) => (
+              <Skeleton key={i} className="h-96 w-full rounded-lg" />
+            ))}
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
