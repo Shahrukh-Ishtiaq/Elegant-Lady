@@ -20,8 +20,8 @@ import {
   SheetTitle,
 } from "./ui/sheet";
 import { useState } from "react";
-import { useCart } from "../contexts/CartContext";
-import { useAuth } from "../contexts/AuthContext";
+import { useCart } from "@/contexts/CartContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
 interface HeaderProps {

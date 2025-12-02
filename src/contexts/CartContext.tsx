@@ -114,53 +114,19 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     if (user) {
       // Save to database for logged-in users
       try {
-        // Normalize empty strings to null for proper unique constraint matching
-        const selectedSize = item.selectedSize || null;
-        const selectedColor = item.selectedColor || null;
-
-        // Check if item already exists
-        let query = supabase
+        const { error } = await supabase
           .from('cart_items')
-          .select('id, quantity')
-          .eq('user_id', user.id)
-          .eq('product_id', item.id);
+          .upsert({
+            user_id: user.id,
+            product_id: item.id,
+            quantity: item.quantity,
+            selected_size: item.selectedSize,
+            selected_color: item.selectedColor,
+          }, {
+            onConflict: 'user_id,product_id,selected_size,selected_color',
+          });
 
-        if (selectedSize) {
-          query = query.eq('selected_size', selectedSize);
-        } else {
-          query = query.is('selected_size', null);
-        }
-
-        if (selectedColor) {
-          query = query.eq('selected_color', selectedColor);
-        } else {
-          query = query.is('selected_color', null);
-        }
-
-        const { data: existing } = await query.maybeSingle();
-
-        if (existing) {
-          // Update quantity
-          const { error } = await supabase
-            .from('cart_items')
-            .update({ quantity: existing.quantity + item.quantity })
-            .eq('id', existing.id);
-
-          if (error) throw error;
-        } else {
-          // Insert new item
-          const { error } = await supabase
-            .from('cart_items')
-            .insert({
-              user_id: user.id,
-              product_id: item.id,
-              quantity: item.quantity,
-              selected_size: selectedSize,
-              selected_color: selectedColor,
-            });
-
-          if (error) throw error;
-        }
+        if (error) throw error;
         
         // Reload cart from DB to get accurate state
         await loadCartFromDB();

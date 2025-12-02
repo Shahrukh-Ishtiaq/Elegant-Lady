@@ -1,12 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useProduct, useProducts } from "@/hooks/useProducts";
+import { products } from "@/data/products";
 import { ShoppingCart, Heart, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useCart } from "@/contexts/CartContext";
@@ -15,50 +14,14 @@ import { ProductReviews } from "@/components/ProductReviews";
 
 const ProductDetail = () => {
   const { id } = useParams();
-  const { product, loading, error } = useProduct(id);
-  const { products } = useProducts();
+  const product = products.find((p) => p.id === id);
   const { cart, addToCart, toggleWishlist, isInWishlist } = useCart();
   
   const [selectedSize, setSelectedSize] = useState<string>("");
   const [selectedColor, setSelectedColor] = useState<string>("");
   const [selectedImage, setSelectedImage] = useState(0);
-
-  // Reset selections when product changes
-  useEffect(() => {
-    setSelectedSize("");
-    setSelectedColor("");
-    setSelectedImage(0);
-  }, [id]);
-
-  const relatedProducts = useMemo(() => {
-    if (!product) return [];
-    return products
-      .filter((p) => p.category === product.category && p.id !== product.id)
-      .slice(0, 4);
-  }, [products, product]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Header cartItemCount={cart.length} />
-        <div className="container mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            <Skeleton className="aspect-[3/4] w-full rounded-xl" />
-            <div className="space-y-4">
-              <Skeleton className="h-8 w-24" />
-              <Skeleton className="h-12 w-3/4" />
-              <Skeleton className="h-6 w-32" />
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          </div>
-        </div>
-        <Footer />
-      </div>
-    );
-  }
   
-  if (error || !product) {
+  if (!product) {
     return (
       <div className="min-h-screen bg-background">
         <Header cartItemCount={cart.length} />
@@ -73,20 +36,24 @@ const ProductDetail = () => {
     );
   }
 
+  const relatedProducts = products
+    .filter((p) => p.category === product.category && p.id !== product.id)
+    .slice(0, 4);
+
   const handleAddToCart = () => {
-    if (!selectedSize && product.sizes.length > 0) {
+    if (!selectedSize) {
       toast.error("Please select a size");
       return;
     }
-    if (!selectedColor && product.colors.length > 0) {
+    if (!selectedColor) {
       toast.error("Please select a color");
       return;
     }
     addToCart({
       ...product,
       quantity: 1,
-      selectedSize: selectedSize || product.sizes[0] || "",
-      selectedColor: selectedColor || product.colors[0] || "",
+      selectedSize,
+      selectedColor,
     });
   };
 
@@ -106,30 +73,28 @@ const ProductDetail = () => {
           <div className="space-y-4">
             <div className="aspect-[3/4] overflow-hidden rounded-xl bg-muted shadow-soft">
               <img 
-                src={product.images[selectedImage] || "/placeholder.svg"} 
+                src={product.images[selectedImage]} 
                 alt={product.name}
                 className="w-full h-full object-cover"
               />
             </div>
-            {product.images.length > 1 && (
-              <div className="grid grid-cols-4 gap-4">
-                {product.images.map((img, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setSelectedImage(idx)}
-                    className={`aspect-square overflow-hidden rounded-lg bg-muted border-2 transition-colors cursor-pointer ${
-                      selectedImage === idx ? "border-primary" : "border-transparent hover:border-primary/50"
-                    }`}
-                  >
-                    <img 
-                      src={img} 
-                      alt={`${product.name} view ${idx + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="grid grid-cols-4 gap-4">
+              {product.images.map((img, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setSelectedImage(idx)}
+                  className={`aspect-square overflow-hidden rounded-lg bg-muted border-2 transition-colors cursor-pointer ${
+                    selectedImage === idx ? "border-primary" : "border-transparent hover:border-primary/50"
+                  }`}
+                >
+                  <img 
+                    src={img} 
+                    alt={`${product.name} view ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Product Info */}
@@ -151,41 +116,37 @@ const ProductDetail = () => {
             </p>
 
             {/* Size Selection */}
-            {product.sizes.length > 0 && (
-              <div className="space-y-3">
-                <label className="text-sm font-semibold">Select Size</label>
-                <div className="flex flex-wrap gap-2">
-                  {product.sizes.map((size) => (
-                    <Button
-                      key={size}
-                      variant={selectedSize === size ? "default" : "outline"}
-                      onClick={() => setSelectedSize(size)}
-                      className="min-w-[60px]"
-                    >
-                      {size}
-                    </Button>
-                  ))}
-                </div>
+            <div className="space-y-3">
+              <label className="text-sm font-semibold">Select Size</label>
+              <div className="flex flex-wrap gap-2">
+                {product.sizes.map((size) => (
+                  <Button
+                    key={size}
+                    variant={selectedSize === size ? "default" : "outline"}
+                    onClick={() => setSelectedSize(size)}
+                    className="min-w-[60px]"
+                  >
+                    {size}
+                  </Button>
+                ))}
               </div>
-            )}
+            </div>
 
             {/* Color Selection */}
-            {product.colors.length > 0 && (
-              <div className="space-y-3">
-                <label className="text-sm font-semibold">Select Color</label>
-                <div className="flex flex-wrap gap-2">
-                  {product.colors.map((color) => (
-                    <Button
-                      key={color}
-                      variant={selectedColor === color ? "default" : "outline"}
-                      onClick={() => setSelectedColor(color)}
-                    >
-                      {color}
-                    </Button>
-                  ))}
-                </div>
+            <div className="space-y-3">
+              <label className="text-sm font-semibold">Select Color</label>
+              <div className="flex flex-wrap gap-2">
+                {product.colors.map((color) => (
+                  <Button
+                    key={color}
+                    variant={selectedColor === color ? "default" : "outline"}
+                    onClick={() => setSelectedColor(color)}
+                  >
+                    {color}
+                  </Button>
+                ))}
               </div>
-            )}
+            </div>
 
             {/* Actions */}
             <div className="flex gap-4 pt-4">
@@ -249,7 +210,7 @@ const ProductDetail = () => {
                   <Link to={`/product/${relatedProduct.id}`}>
                     <div className="aspect-[3/4] overflow-hidden rounded-t-lg bg-muted">
                       <img 
-                        src={relatedProduct.images[0] || "/placeholder.svg"} 
+                        src={relatedProduct.images[0]} 
                         alt={relatedProduct.name}
                         className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                       />
