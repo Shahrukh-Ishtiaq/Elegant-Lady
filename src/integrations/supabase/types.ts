@@ -121,10 +121,14 @@ export type Database = {
           colors: string[] | null
           created_at: string
           description: string | null
+          discount_percentage: number | null
           id: string
           images: string[] | null
           in_stock: boolean | null
+          is_featured: boolean | null
+          is_new: boolean | null
           name: string
+          original_price: number | null
           price: number
           rating: number | null
           review_count: number | null
@@ -137,10 +141,14 @@ export type Database = {
           colors?: string[] | null
           created_at?: string
           description?: string | null
+          discount_percentage?: number | null
           id?: string
           images?: string[] | null
           in_stock?: boolean | null
+          is_featured?: boolean | null
+          is_new?: boolean | null
           name: string
+          original_price?: number | null
           price: number
           rating?: number | null
           review_count?: number | null
@@ -153,10 +161,14 @@ export type Database = {
           colors?: string[] | null
           created_at?: string
           description?: string | null
+          discount_percentage?: number | null
           id?: string
           images?: string[] | null
           in_stock?: boolean | null
+          is_featured?: boolean | null
+          is_new?: boolean | null
           name?: string
+          original_price?: number | null
           price?: number
           rating?: number | null
           review_count?: number | null
