@@ -7,10 +7,30 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { products } from "@/data/products";
+import { supabase } from "@/integrations/supabase/client";
 import { ShoppingCart, Heart, Loader2 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { StarRating } from "@/components/StarRating";
+
+interface Product {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  original_price: number;
+  discount_percentage: number;
+  category_id: string;
+  images: string[];
+  sizes: string[];
+  colors: string[];
+  in_stock: boolean;
+  stock_quantity: number;
+  rating: number;
+  review_count: number;
+  is_featured: boolean;
+  is_new: boolean;
+  category?: { name: string };
+}
 
 const PRODUCTS_PER_PAGE = 8;
 
@@ -26,9 +46,43 @@ const Shop = () => {
   const [ratingFilter, setRatingFilter] = useState<string>("all");
   const [displayCount, setDisplayCount] = useState(PRODUCTS_PER_PAGE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const { cart, addToCart, toggleWishlist, isInWishlist, wishlist } = useCart();
+
+  // Fetch products from database
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          *,
+          category:categories(name)
+        `)
+        .eq('in_stock', true);
+      
+      if (data && !error) {
+        setProducts(data as Product[]);
+      }
+      setLoading(false);
+    };
+
+    const fetchCategories = async () => {
+      const { data } = await supabase
+        .from('categories')
+        .select('id, name');
+      if (data) {
+        setCategories(data);
+      }
+    };
+
+    fetchProducts();
+    fetchCategories();
+  }, []);
 
   const filteredProducts = useMemo(() => {
     let filtered = products;
@@ -42,22 +96,22 @@ const Shop = () => {
     if (searchQuery) {
       filtered = filtered.filter((product) =>
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.category.toLowerCase().includes(searchQuery.toLowerCase())
+        (product.description && product.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (product.category?.name && product.category.name.toLowerCase().includes(searchQuery.toLowerCase()))
       );
     }
     
     // Category filter
     if (selectedCategory !== "all") {
       filtered = filtered.filter((product) => 
-        product.category.toLowerCase() === selectedCategory.toLowerCase()
+        product.category?.name?.toLowerCase() === selectedCategory.toLowerCase()
       );
     }
     
     // Color filter
     if (selectedColor !== "all") {
       filtered = filtered.filter((product) =>
-        product.colors.some(c => c.toLowerCase().includes(selectedColor.toLowerCase()))
+        product.colors && product.colors.some(c => c.toLowerCase().includes(selectedColor.toLowerCase()))
       );
     }
     
@@ -75,11 +129,11 @@ const Shop = () => {
     // Rating filter
     if (ratingFilter !== "all") {
       const minRating = parseFloat(ratingFilter);
-      filtered = filtered.filter((product) => product.rating >= minRating);
+      filtered = filtered.filter((product) => (product.rating || 0) >= minRating);
     }
     
     return filtered;
-  }, [selectedCategory, selectedColor, priceRange, ratingFilter, searchQuery, wishlistFilter, wishlist, isInWishlist]);
+  }, [products, selectedCategory, selectedColor, priceRange, ratingFilter, searchQuery, wishlistFilter, wishlist, isInWishlist]);
 
   // Reset display count when filters change
   useEffect(() => {
@@ -121,12 +175,22 @@ const Shop = () => {
     return () => observer.disconnect();
   }, [loadMore, hasMoreProducts, isLoadingMore]);
 
-  const handleAddToCart = (product: typeof products[0]) => {
+  const handleAddToCart = (product: Product) => {
     addToCart({
-      ...product,
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      description: product.description || '',
+      category: product.category?.name || '',
+      images: product.images || [],
+      sizes: product.sizes || [],
+      colors: product.colors || [],
+      inStock: product.in_stock,
+      rating: product.rating || 0,
+      reviewCount: product.review_count || 0,
       quantity: 1,
-      selectedSize: product.sizes[0],
-      selectedColor: product.colors[0],
+      selectedSize: product.sizes?.[0] || '',
+      selectedColor: product.colors?.[0] || '',
     });
   };
 
@@ -162,11 +226,11 @@ const Shop = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
-              <SelectItem value="bras">Bras</SelectItem>
-              <SelectItem value="panties">Panties</SelectItem>
-              <SelectItem value="nightwear">Nightwear</SelectItem>
-              <SelectItem value="loungewear">Loungewear</SelectItem>
-              <SelectItem value="shapewear">Shapewear</SelectItem>
+              {categories.map((cat) => (
+                <SelectItem key={cat.id} value={cat.name.toLowerCase()}>
+                  {cat.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
@@ -227,35 +291,64 @@ const Shop = () => {
         </div>
 
         {/* Products Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {displayedProducts.map((product) => (
-            <Card key={product.id} className="border-none shadow-soft hover:shadow-elegant transition-all group">
-              <Link to={`/product/${product.id}`}>
-                <div className="relative overflow-hidden rounded-t-lg aspect-[3/4] bg-muted">
-                  <img 
-                    src={product.images[0]} 
-                    alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    loading="lazy"
-                  />
-                  {product.inStock && (
-                    <Badge className="absolute top-4 right-4 bg-accent">New</Badge>
-                  )}
-                </div>
-              </Link>
-              <CardContent className="p-4">
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="space-y-4">
+                <Skeleton className="h-64 w-full rounded-lg" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {displayedProducts.map((product) => (
+              <Card key={product.id} className="border-none shadow-soft hover:shadow-elegant transition-all group">
                 <Link to={`/product/${product.id}`}>
-                  <Badge variant="secondary" className="mb-2">{product.category}</Badge>
-                  <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">
-                    {product.name}
-                  </h3>
-                  <div className="flex items-center gap-2 mb-2">
-                    <StarRating rating={product.rating} size="sm" />
-                    <span className="text-xs text-muted-foreground">({product.reviewCount})</span>
+                  <div className="relative overflow-hidden rounded-t-lg aspect-[3/4] bg-muted">
+                    {product.images && product.images[0] ? (
+                      <img 
+                        src={product.images[0]} 
+                        alt={product.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-muted">
+                        <span className="text-muted-foreground">No image</span>
+                      </div>
+                    )}
+                    {product.discount_percentage > 0 && (
+                      <Badge className="absolute top-4 left-4 bg-destructive text-destructive-foreground">
+                        {product.discount_percentage}% OFF
+                      </Badge>
+                    )}
+                    {product.is_new && (
+                      <Badge className="absolute top-4 right-4 bg-accent">New</Badge>
+                    )}
                   </div>
-                  <p className="text-lg font-bold text-primary">PKR {product.price.toLocaleString()}</p>
                 </Link>
-              </CardContent>
+                <CardContent className="p-4">
+                  <Link to={`/product/${product.id}`}>
+                    <Badge variant="secondary" className="mb-2">{product.category?.name || 'Uncategorized'}</Badge>
+                    <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">
+                      {product.name}
+                    </h3>
+                    <div className="flex items-center gap-2 mb-2">
+                      <StarRating rating={product.rating || 0} size="sm" />
+                      <span className="text-xs text-muted-foreground">({product.review_count || 0})</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-lg font-bold text-primary">PKR {product.price.toLocaleString()}</p>
+                      {product.discount_percentage > 0 && product.original_price > product.price && (
+                        <p className="text-sm text-muted-foreground line-through">
+                          PKR {product.original_price.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  </Link>
+                </CardContent>
               <CardFooter className="p-4 pt-0 flex gap-2">
                 <Button 
                   className="flex-1" 
@@ -274,9 +367,10 @@ const Shop = () => {
                   <Heart className={`h-4 w-4 ${isInWishlist(product.id) ? "fill-current" : ""}`} />
                 </Button>
               </CardFooter>
-            </Card>
-          ))}
-        </div>
+              </Card>
+            ))}
+          </div>
+        )}
 
         {/* Loading More Indicator */}
         {hasMoreProducts && (

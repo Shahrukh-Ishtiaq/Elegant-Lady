@@ -17,12 +17,16 @@ interface Product {
   name: string;
   description: string | null;
   price: number;
+  original_price: number;
+  discount_percentage: number;
   category_id: string | null;
   images: string[];
   sizes: string[];
   colors: string[];
   in_stock: boolean;
   stock_quantity: number;
+  is_featured: boolean;
+  is_new: boolean;
 }
 
 interface Category {
@@ -40,11 +44,15 @@ export const AdminProducts = () => {
     name: "",
     description: "",
     price: "",
+    original_price: "",
+    discount_percentage: "0",
     category_id: "",
     images: "",
     sizes: "S,M,L,XL",
     colors: "Black,White,Pink",
     stock_quantity: "10",
+    is_featured: false,
+    is_new: false,
   });
 
   useEffect(() => {
@@ -131,11 +139,15 @@ export const AdminProducts = () => {
       name: product.name,
       description: product.description || "",
       price: product.price.toString(),
+      original_price: product.original_price.toString(),
+      discount_percentage: product.discount_percentage.toString(),
       category_id: product.category_id || "",
       images: product.images.join(", "),
       sizes: product.sizes.join(", "),
       colors: product.colors.join(", "),
       stock_quantity: product.stock_quantity.toString(),
+      is_featured: product.is_featured,
+      is_new: product.is_new,
     });
     setIsDialogOpen(true);
   };
@@ -164,11 +176,15 @@ export const AdminProducts = () => {
       name: "",
       description: "",
       price: "",
+      original_price: "",
+      discount_percentage: "0",
       category_id: "",
       images: "",
       sizes: "S,M,L,XL",
       colors: "Black,White,Pink",
       stock_quantity: "10",
+      is_featured: false,
+      is_new: false,
     });
   };
 
@@ -243,6 +259,57 @@ export const AdminProducts = () => {
                     value={formData.stock_quantity}
                     onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
                   />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="originalPrice">Original Price (PKR)</Label>
+                  <Input
+                    id="originalPrice"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.original_price}
+                    onChange={(e) => setFormData({ ...formData, original_price: e.target.value })}
+                    placeholder="Leave empty if no discount"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="discount">Discount %</Label>
+                  <Input
+                    id="discount"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={formData.discount_percentage}
+                    onChange={(e) => setFormData({ ...formData, discount_percentage: e.target.value })}
+                  />
+                </div>
+              </div>
+              
+              <div className="flex gap-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="isFeatured"
+                    checked={formData.is_featured}
+                    onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  <Label htmlFor="isFeatured" className="cursor-pointer">Featured Product</Label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="isNew"
+                    checked={formData.is_new}
+                    onChange={(e) => setFormData({ ...formData, is_new: e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  <Label htmlFor="isNew" className="cursor-pointer">New Arrival</Label>
                 </div>
               </div>
               
