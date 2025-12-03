@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { ImageUpload } from "./ImageUpload";
 
 interface Product {
   id: string;
@@ -47,7 +48,7 @@ export const AdminProducts = () => {
     original_price: "",
     discount_percentage: "0",
     category_id: "",
-    images: "",
+    images: [] as string[],
     sizes: "S,M,L,XL",
     colors: "Black,White,Pink",
     stock_quantity: "10",
@@ -98,12 +99,16 @@ export const AdminProducts = () => {
       name: formData.name,
       description: formData.description || null,
       price: parseFloat(formData.price),
+      original_price: formData.original_price ? parseFloat(formData.original_price) : null,
+      discount_percentage: parseInt(formData.discount_percentage) || 0,
       category_id: formData.category_id || null,
-      images: formData.images.split(",").map(s => s.trim()).filter(Boolean),
+      images: formData.images,
       sizes: formData.sizes.split(",").map(s => s.trim()).filter(Boolean),
       colors: formData.colors.split(",").map(s => s.trim()).filter(Boolean),
       stock_quantity: parseInt(formData.stock_quantity) || 0,
       in_stock: parseInt(formData.stock_quantity) > 0,
+      is_featured: formData.is_featured,
+      is_new: formData.is_new,
     };
 
     try {
@@ -139,15 +144,15 @@ export const AdminProducts = () => {
       name: product.name,
       description: product.description || "",
       price: product.price.toString(),
-      original_price: product.original_price.toString(),
-      discount_percentage: product.discount_percentage.toString(),
+      original_price: product.original_price?.toString() || "",
+      discount_percentage: product.discount_percentage?.toString() || "0",
       category_id: product.category_id || "",
-      images: product.images.join(", "),
-      sizes: product.sizes.join(", "),
-      colors: product.colors.join(", "),
-      stock_quantity: product.stock_quantity.toString(),
-      is_featured: product.is_featured,
-      is_new: product.is_new,
+      images: product.images || [],
+      sizes: product.sizes?.join(", ") || "S,M,L,XL",
+      colors: product.colors?.join(", ") || "Black,White,Pink",
+      stock_quantity: product.stock_quantity?.toString() || "10",
+      is_featured: product.is_featured || false,
+      is_new: product.is_new || false,
     });
     setIsDialogOpen(true);
   };
@@ -179,7 +184,7 @@ export const AdminProducts = () => {
       original_price: "",
       discount_percentage: "0",
       category_id: "",
-      images: "",
+      images: [],
       sizes: "S,M,L,XL",
       colors: "Black,White,Pink",
       stock_quantity: "10",
@@ -333,12 +338,10 @@ export const AdminProducts = () => {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="images">Image URLs (comma-separated)</Label>
-                <Textarea
-                  id="images"
-                  value={formData.images}
-                  onChange={(e) => setFormData({ ...formData, images: e.target.value })}
-                  placeholder="https://example.com/image1.jpg, https://example.com/image2.jpg"
+                <Label>Product Images</Label>
+                <ImageUpload
+                  images={formData.images}
+                  onImagesChange={(images) => setFormData({ ...formData, images })}
                 />
               </div>
               
@@ -387,7 +390,7 @@ export const AdminProducts = () => {
                   <TableRow key={product.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        {product.images[0] && (
+                        {product.images && product.images[0] && (
                           <img
                             src={product.images[0]}
                             alt={product.name}
