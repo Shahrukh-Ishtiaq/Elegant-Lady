@@ -31,7 +31,6 @@ const Checkout = () => {
     zip: "",
   });
 
-  // Calculate totals from cart
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const shipping = subtotal > 5000 ? 0 : 250;
   const total = subtotal + shipping;
@@ -39,6 +38,38 @@ const Checkout = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setFormData(prev => ({ ...prev, [id]: value }));
+  };
+
+  const sendOrderConfirmationEmail = async (orderId: string) => {
+    try {
+      const { error } = await supabase.functions.invoke('send-order-email', {
+        body: {
+          orderId,
+          customerEmail: formData.email,
+          customerName: `${formData.firstName} ${formData.lastName}`,
+          items: cart.map(item => ({
+            id: item.id,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            selectedSize: item.selectedSize,
+            selectedColor: item.selectedColor,
+            image: item.images?.[0],
+          })),
+          total,
+          shippingAddress: formData,
+          paymentMethod,
+        },
+      });
+
+      if (error) {
+        console.error("Error sending email:", error);
+      } else {
+        console.log("Order confirmation email sent");
+      }
+    } catch (error) {
+      console.error("Failed to send confirmation email:", error);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,7 +83,6 @@ const Checkout = () => {
     setIsSubmitting(true);
 
     try {
-      // Create order in database
       const orderData = {
         user_id: user?.id || null,
         status: "pending",
@@ -79,9 +109,14 @@ const Checkout = () => {
         })),
       };
 
-      const { error } = await supabase.from("orders").insert(orderData);
+      const { data, error } = await supabase.from("orders").insert(orderData).select().single();
 
       if (error) throw error;
+
+      // Send order confirmation email
+      if (data?.id) {
+        await sendOrderConfirmationEmail(data.id);
+      }
 
       const paymentMsg = paymentMethod === "card" 
         ? "Payment processed successfully! Order confirmed." 
@@ -128,10 +163,8 @@ const Checkout = () => {
         <h1 className="text-3xl md:text-4xl font-bold mb-8">Checkout</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Checkout Form */}
           <div className="lg:col-span-2">
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Shipping Information */}
               <Card className="border-none shadow-soft">
                 <CardHeader>
                   <CardTitle>Shipping Information</CardTitle>
@@ -230,7 +263,6 @@ const Checkout = () => {
                 </CardContent>
               </Card>
 
-              {/* Payment Method */}
               <Card className="border-none shadow-soft">
                 <CardHeader>
                   <CardTitle>Payment Method</CardTitle>
@@ -319,14 +351,12 @@ const Checkout = () => {
             </form>
           </div>
 
-          {/* Order Summary */}
           <div>
             <Card className="border-none shadow-soft sticky top-24">
               <CardHeader>
                 <CardTitle>Order Summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Cart Items */}
                 <div className="space-y-3 max-h-64 overflow-y-auto">
                   {cart.map((item, index) => (
                     <div key={`${item.id}-${index}`} className="flex gap-3">
