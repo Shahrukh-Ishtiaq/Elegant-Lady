@@ -5,12 +5,13 @@ import { Footer } from "@/components/Footer";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Package, ShoppingCart, Users, DollarSign } from "lucide-react";
+import { Loader2, Package, ShoppingCart, Users, DollarSign, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminProducts } from "@/components/admin/AdminProducts";
 import { AdminOrders } from "@/components/admin/AdminOrders";
 import { AdminCategories } from "@/components/admin/AdminCategories";
 import { AdminUsers } from "@/components/admin/AdminUsers";
+import { AdminPromotions } from "@/components/admin/AdminPromotions";
 
 const AdminDashboard = () => {
   const { user, isAdmin, loading } = useAuth();
@@ -137,10 +138,14 @@ const AdminDashboard = () => {
 
         {/* Main Content */}
         <Tabs defaultValue="orders" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 max-w-md">
+          <TabsList className="grid w-full grid-cols-5 max-w-xl">
             <TabsTrigger value="orders">Orders</TabsTrigger>
             <TabsTrigger value="products">Products</TabsTrigger>
             <TabsTrigger value="categories">Categories</TabsTrigger>
+            <TabsTrigger value="promotions" className="flex items-center gap-1">
+              <Sparkles className="h-3 w-3" />
+              Promos
+            </TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
           </TabsList>
 
@@ -154,6 +159,10 @@ const AdminDashboard = () => {
 
           <TabsContent value="categories">
             <AdminCategories />
+          </TabsContent>
+
+          <TabsContent value="promotions">
+            <AdminPromotions />
           </TabsContent>
 
           <TabsContent value="users">

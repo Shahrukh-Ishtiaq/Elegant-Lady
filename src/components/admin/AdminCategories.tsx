@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Upload, X, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 
 interface Category {
@@ -23,6 +23,8 @@ export const AdminCategories = () => {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -47,6 +49,56 @@ export const AdminCategories = () => {
       toast.error("Failed to load categories");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const uploadImage = async (file: File): Promise<string | null> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `category-${Date.now()}.${fileExt}`;
+    const filePath = `categories/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('stock')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      throw uploadError;
+    }
+
+    const { data } = supabase.storage
+      .from('stock')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const url = await uploadImage(file);
+      if (url) {
+        setFormData({ ...formData, image_url: url });
+        toast.success('Image uploaded successfully');
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error('Failed to upload image');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -149,7 +201,7 @@ export const AdminCategories = () => {
               Add Category
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>
                 {editingCategory ? "Edit Category" : "Add New Category"}
@@ -162,6 +214,7 @@ export const AdminCategories = () => {
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g., Abaya, Ladies Suit"
                   required
                 />
               </div>
@@ -172,20 +225,64 @@ export const AdminCategories = () => {
                   id="description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Category description..."
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="image_url">Image URL</Label>
-                <Input
-                  id="image_url"
-                  value={formData.image_url}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                  placeholder="https://example.com/image.jpg"
-                />
+                <Label>Category Image</Label>
+                <div className="space-y-3">
+                  {formData.image_url ? (
+                    <div className="relative w-full h-32 rounded-lg overflow-hidden bg-muted">
+                      <img 
+                        src={formData.image_url} 
+                        alt="Category preview" 
+                        className="w-full h-full object-cover"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2 h-6 w-6"
+                        onClick={() => setFormData({ ...formData, image_url: "" })}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div 
+                      className="w-full h-32 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 transition-colors"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      {uploading ? (
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                      ) : (
+                        <>
+                          <ImageIcon className="h-8 w-8 text-muted-foreground mb-2" />
+                          <span className="text-sm text-muted-foreground">Click to upload</span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                  <div className="text-center">
+                    <span className="text-xs text-muted-foreground">or paste URL</span>
+                  </div>
+                  <Input
+                    value={formData.image_url}
+                    onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                    placeholder="https://example.com/image.jpg"
+                  />
+                </div>
               </div>
               
-              <Button type="submit" className="w-full">
+              <Button type="submit" className="w-full" disabled={uploading}>
                 {editingCategory ? "Update Category" : "Create Category"}
               </Button>
             </form>
@@ -200,6 +297,7 @@ export const AdminCategories = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Image</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Actions</TableHead>
@@ -208,8 +306,21 @@ export const AdminCategories = () => {
               <TableBody>
                 {categories.map((category) => (
                   <TableRow key={category.id}>
+                    <TableCell>
+                      {category.image_url ? (
+                        <img 
+                          src={category.image_url} 
+                          alt={category.name}
+                          className="w-12 h-12 object-cover rounded-lg"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center">
+                          <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="font-medium">{category.name}</TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="text-muted-foreground max-w-xs truncate">
                       {category.description || "-"}
                     </TableCell>
                     <TableCell>

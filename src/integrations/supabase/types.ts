@@ -219,6 +219,45 @@ export type Database = {
         }
         Relationships: []
       }
+      promotions: {
+        Row: {
+          badge_text: string | null
+          created_at: string
+          description: string | null
+          discount_percentage: number | null
+          end_date: string | null
+          id: string
+          is_active: boolean | null
+          start_date: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          badge_text?: string | null
+          created_at?: string
+          description?: string | null
+          discount_percentage?: number | null
+          end_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          start_date?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          badge_text?: string | null
+          created_at?: string
+          description?: string | null
+          discount_percentage?: number | null
+          end_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          start_date?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
