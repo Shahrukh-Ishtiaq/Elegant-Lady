@@ -12,6 +12,19 @@ import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ShoppingBag, Loader2 } from "lucide-react";
+import { z } from "zod";
+
+// Validation schema for checkout form
+const checkoutSchema = z.object({
+  firstName: z.string().min(1, "First name is required").max(100, "First name too long"),
+  lastName: z.string().min(1, "Last name is required").max(100, "Last name too long"),
+  email: z.string().email("Invalid email address").max(255, "Email too long"),
+  phone: z.string().min(5, "Phone number too short").max(20, "Phone number too long").regex(/^[0-9+\-\s()]+$/, "Invalid phone number format"),
+  address: z.string().min(5, "Address is required").max(500, "Address too long"),
+  city: z.string().min(2, "City is required").max(100, "City name too long"),
+  state: z.string().min(2, "State/Province is required").max(100, "State name too long"),
+  zip: z.string().min(3, "Postal code is required").max(20, "Postal code too long"),
+});
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -77,6 +90,14 @@ const Checkout = () => {
     
     if (cart.length === 0) {
       toast.error("Your cart is empty");
+      return;
+    }
+
+    // Validate form data with zod
+    const validationResult = checkoutSchema.safeParse(formData);
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0];
+      toast.error(firstError.message);
       return;
     }
 
@@ -278,63 +299,10 @@ const Checkout = () => {
                         </div>
                       </Label>
                     </div>
-                    <div className="flex items-center space-x-2 p-4 border rounded-lg">
-                      <RadioGroupItem value="card" id="card" disabled={isSubmitting} />
-                      <Label htmlFor="card" className="flex-1 cursor-pointer">
-                        <div>
-                          <p className="font-semibold">Credit/Debit Card</p>
-                          <p className="text-sm text-muted-foreground">Pay securely with your card</p>
-                        </div>
-                      </Label>
-                    </div>
                   </RadioGroup>
-
-                  {paymentMethod === "card" && (
-                    <div className="mt-4 space-y-4 p-4 border rounded-lg bg-muted/30">
-                      <div className="space-y-2">
-                        <Label htmlFor="cardNumber">Card Number</Label>
-                        <Input 
-                          id="cardNumber" 
-                          placeholder="1234 5678 9012 3456"
-                          maxLength={19}
-                          required={paymentMethod === "card"}
-                          disabled={isSubmitting}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="expiry">Expiry Date</Label>
-                          <Input 
-                            id="expiry" 
-                            placeholder="MM/YY"
-                            maxLength={5}
-                            required={paymentMethod === "card"}
-                            disabled={isSubmitting}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="cvv">CVV</Label>
-                          <Input 
-                            id="cvv" 
-                            placeholder="123"
-                            maxLength={4}
-                            type="password"
-                            required={paymentMethod === "card"}
-                            disabled={isSubmitting}
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="cardName">Cardholder Name</Label>
-                        <Input 
-                          id="cardName" 
-                          placeholder="Name on card"
-                          required={paymentMethod === "card"}
-                          disabled={isSubmitting}
-                        />
-                      </div>
-                    </div>
-                  )}
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Currently only Cash on Delivery is available. Card payments coming soon.
+                  </p>
                 </CardContent>
               </Card>
 

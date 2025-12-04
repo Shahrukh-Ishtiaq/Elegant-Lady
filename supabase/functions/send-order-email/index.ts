@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -7,6 +8,28 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Simple in-memory rate limiting (resets on function cold start)
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT = 5; // max 5 emails per email address
+const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour in ms
+
+function isRateLimited(email: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(email);
+  
+  if (!entry || now > entry.resetTime) {
+    rateLimitMap.set(email, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    return false;
+  }
+  
+  if (entry.count >= RATE_LIMIT) {
+    return true;
+  }
+  
+  entry.count++;
+  return false;
+}
 
 interface OrderItem {
   id: string;
@@ -56,6 +79,51 @@ const handler = async (req: Request): Promise<Response> => {
       shippingAddress, 
       paymentMethod 
     }: OrderEmailRequest = await req.json();
+
+    // Input validation
+    if (!orderId || typeof orderId !== 'string' || orderId.length < 10) {
+      console.error("Invalid orderId provided");
+      return new Response(
+        JSON.stringify({ error: "Invalid order ID" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    if (!customerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
+      console.error("Invalid email provided");
+      return new Response(
+        JSON.stringify({ error: "Invalid email address" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Rate limiting check
+    if (isRateLimited(customerEmail)) {
+      console.warn(`Rate limit exceeded for email: ${customerEmail}`);
+      return new Response(
+        JSON.stringify({ error: "Too many email requests. Please try again later." }),
+        { status: 429, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Verify order exists in database
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { data: order, error: orderError } = await supabase
+      .from("orders")
+      .select("id, status")
+      .eq("id", orderId)
+      .single();
+
+    if (orderError || !order) {
+      console.error("Order not found:", orderId);
+      return new Response(
+        JSON.stringify({ error: "Order not found" }),
+        { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
 
     console.log("Processing order email for:", customerEmail);
 
