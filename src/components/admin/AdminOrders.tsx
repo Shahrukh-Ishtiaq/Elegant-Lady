@@ -4,9 +4,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Bell, Package } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Loader2, Bell, Package, Eye, MapPin, Phone, Mail, CreditCard, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+
+interface OrderItem {
+  name: string;
+  quantity: number;
+  price: number;
+  selectedSize?: string;
+  selectedColor?: string;
+}
 
 interface Order {
   id: string;
@@ -20,13 +30,11 @@ interface Order {
     phone?: string;
     address?: string;
     city?: string;
+    state?: string;
+    zip?: string;
   };
   payment_method: string;
-  items: Array<{
-    name: string;
-    quantity: number;
-    price: number;
-  }>;
+  items: OrderItem[];
   created_at: string;
 }
 
@@ -34,6 +42,8 @@ export const AdminOrders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [newOrderCount, setNewOrderCount] = useState(0);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -151,6 +161,11 @@ export const AdminOrders = () => {
     setNewOrderCount(0);
   };
 
+  const viewOrderDetails = (order: Order) => {
+    setSelectedOrder(order);
+    setDetailsOpen(true);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending": return "bg-yellow-500";
@@ -209,6 +224,10 @@ export const AdminOrders = () => {
                   <TableHead>Customer</TableHead>
                   <TableHead>Items</TableHead>
                   <TableHead>Total</TableHead>
+                  <TableHead>Payment</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Actions</TableHead>
                   <TableHead>Payment</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Date</TableHead>
@@ -282,6 +301,16 @@ export const AdminOrders = () => {
                     <TableCell className="text-sm text-muted-foreground">
                       {format(new Date(order.created_at), "MMM dd, HH:mm")}
                     </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => viewOrderDetails(order)}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -289,6 +318,140 @@ export const AdminOrders = () => {
           </div>
         )}
       </CardContent>
+
+      {/* Order Details Modal */}
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Order #{selectedOrder?.id.slice(0, 8).toUpperCase()}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedOrder && (
+            <div className="space-y-6">
+              {/* Order Status */}
+              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <Badge className={getStatusColor(selectedOrder.status)}>
+                    {selectedOrder.status.toUpperCase()}
+                  </Badge>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">Order Total</p>
+                  <p className="text-2xl font-bold text-primary">
+                    PKR {Number(selectedOrder.total).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
+              {/* Customer Information */}
+              <div className="space-y-3">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Mail className="h-4 w-4" /> Customer Information
+                </h3>
+                <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Name</p>
+                    <p className="font-medium">
+                      {selectedOrder.shipping_address?.firstName} {selectedOrder.shipping_address?.lastName}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Email</p>
+                    <p className="font-medium">{selectedOrder.shipping_address?.email || "N/A"}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Phone</p>
+                      <p className="font-medium">{selectedOrder.shipping_address?.phone || "N/A"}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Payment</p>
+                      <p className="font-medium">
+                        {selectedOrder.payment_method === "cod" ? "Cash on Delivery" : "Card"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Shipping Address */}
+              <div className="space-y-3">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <MapPin className="h-4 w-4" /> Shipping Address
+                </h3>
+                <div className="p-4 border rounded-lg">
+                  <p>{selectedOrder.shipping_address?.address}</p>
+                  <p>
+                    {selectedOrder.shipping_address?.city}
+                    {selectedOrder.shipping_address?.state && `, ${selectedOrder.shipping_address.state}`}
+                    {selectedOrder.shipping_address?.zip && ` ${selectedOrder.shipping_address.zip}`}
+                  </p>
+                </div>
+              </div>
+
+              {/* Order Items */}
+              <div className="space-y-3">
+                <h3 className="font-semibold">Order Items ({selectedOrder.items?.length || 0})</h3>
+                <div className="border rounded-lg divide-y">
+                  {selectedOrder.items?.map((item, idx) => (
+                    <div key={idx} className="p-4 flex justify-between items-center">
+                      <div>
+                        <p className="font-medium">{item.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Qty: {item.quantity}
+                          {item.selectedSize && ` • Size: ${item.selectedSize}`}
+                          {item.selectedColor && ` • Color: ${item.selectedColor}`}
+                        </p>
+                      </div>
+                      <p className="font-semibold">
+                        PKR {(item.price * item.quantity).toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Order Date */}
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                Ordered on {format(new Date(selectedOrder.created_at), "MMMM dd, yyyy 'at' HH:mm")}
+              </div>
+
+              {/* Update Status */}
+              <div className="flex items-center gap-4 pt-4 border-t">
+                <span className="text-sm font-medium">Update Status:</span>
+                <Select
+                  value={selectedOrder.status}
+                  onValueChange={(value) => {
+                    updateOrderStatus(selectedOrder.id, value);
+                    setSelectedOrder({ ...selectedOrder, status: value });
+                  }}
+                >
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                    <SelectItem value="processing">Processing</SelectItem>
+                    <SelectItem value="shipped">Shipped</SelectItem>
+                    <SelectItem value="delivered">Delivered</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
