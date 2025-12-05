@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -40,7 +41,7 @@ const Shop = () => {
   const searchQuery = searchParams.get("search");
   const wishlistFilter = searchParams.get("filter");
   
-  const [selectedCategory, setSelectedCategory] = useState<string>(categoryFilter || "all");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedColor, setSelectedColor] = useState<string>("all");
   const [priceRange, setPriceRange] = useState<string>("all");
   const [ratingFilter, setRatingFilter] = useState<string>("all");
@@ -52,6 +53,15 @@ const Shop = () => {
   
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const { cart, addToCart, toggleWishlist, isInWishlist, wishlist } = useCart();
+
+  // Sync category filter from URL params
+  useEffect(() => {
+    if (categoryFilter) {
+      setSelectedCategory(categoryFilter.toLowerCase());
+    } else {
+      setSelectedCategory("all");
+    }
+  }, [categoryFilter]);
 
   // Fetch products from database
   useEffect(() => {
@@ -150,7 +160,6 @@ const Shop = () => {
     if (isLoadingMore || !hasMoreProducts) return;
     
     setIsLoadingMore(true);
-    // Simulate loading delay for better UX
     setTimeout(() => {
       setDisplayCount(prev => Math.min(prev + PRODUCTS_PER_PAGE, filteredProducts.length));
       setIsLoadingMore(false);
@@ -203,23 +212,55 @@ const Shop = () => {
 
   const hasActiveFilters = selectedCategory !== "all" || selectedColor !== "all" || priceRange !== "all" || ratingFilter !== "all";
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.05 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.4, ease: "easeOut" }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header cartItemCount={cart.length} />
       
-      <div className="container mx-auto px-4 py-8">
+      <motion.div 
+        className="container mx-auto px-4 py-8"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
         {/* Header */}
-        <div className="mb-8">
+        <motion.div 
+          className="mb-8"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+        >
           <h1 className="text-4xl font-bold mb-2">
-            {wishlistFilter === "wishlist" ? "My Wishlist" : searchQuery ? `Search results for "${searchQuery}"` : "Shop All"}
+            {wishlistFilter === "wishlist" ? "My Wishlist" : searchQuery ? `Search results for "${searchQuery}"` : selectedCategory !== "all" ? `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}` : "Shop All"}
           </h1>
           <p className="text-muted-foreground">
             {wishlistFilter === "wishlist" ? "Your favorite items" : "Discover your perfect pieces"}
           </p>
-        </div>
+        </motion.div>
 
         {/* Filters */}
-        <div className="mb-8 flex flex-wrap gap-4">
+        <motion.div 
+          className="mb-8 flex flex-wrap gap-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+        >
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Category" />
@@ -245,6 +286,8 @@ const Shop = () => {
               <SelectItem value="nude">Nude</SelectItem>
               <SelectItem value="white">White</SelectItem>
               <SelectItem value="black">Black</SelectItem>
+              <SelectItem value="red">Red</SelectItem>
+              <SelectItem value="blue">Blue</SelectItem>
             </SelectContent>
           </Select>
 
@@ -281,14 +324,19 @@ const Shop = () => {
               Clear Filters
             </Button>
           )}
-        </div>
+        </motion.div>
 
         {/* Products Count */}
-        <div className="mb-6">
+        <motion.div 
+          className="mb-6"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+        >
           <p className="text-muted-foreground">
             Showing {displayedProducts.length} of {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
           </p>
-        </div>
+        </motion.div>
 
         {/* Products Grid */}
         {loading ? (
@@ -302,74 +350,81 @@ const Shop = () => {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <motion.div 
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
             {displayedProducts.map((product) => (
-              <Card key={product.id} className="border-none shadow-soft hover:shadow-elegant transition-all group">
-                <Link to={`/product/${product.id}`}>
-                  <div className="relative overflow-hidden rounded-t-lg aspect-[3/4] bg-muted">
-                    {product.images && product.images[0] ? (
-                      <img 
-                        src={product.images[0]} 
-                        alt={product.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-muted">
-                        <span className="text-muted-foreground">No image</span>
-                      </div>
-                    )}
-                    {product.discount_percentage > 0 && (
-                      <Badge className="absolute top-4 left-4 bg-destructive text-destructive-foreground">
-                        {product.discount_percentage}% OFF
-                      </Badge>
-                    )}
-                    {product.is_new && (
-                      <Badge className="absolute top-4 right-4 bg-accent">New</Badge>
-                    )}
-                  </div>
-                </Link>
-                <CardContent className="p-4">
+              <motion.div key={product.id} variants={itemVariants}>
+                <Card className="border-none shadow-soft hover:shadow-elegant transition-all group h-full">
                   <Link to={`/product/${product.id}`}>
-                    <Badge variant="secondary" className="mb-2">{product.category?.name || 'Uncategorized'}</Badge>
-                    <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">
-                      {product.name}
-                    </h3>
-                    <div className="flex items-center gap-2 mb-2">
-                      <StarRating rating={product.rating || 0} size="sm" />
-                      <span className="text-xs text-muted-foreground">({product.review_count || 0})</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-lg font-bold text-primary">PKR {product.price.toLocaleString()}</p>
-                      {product.discount_percentage > 0 && product.original_price > product.price && (
-                        <p className="text-sm text-muted-foreground line-through">
-                          PKR {product.original_price.toLocaleString()}
-                        </p>
+                    <div className="relative overflow-hidden rounded-t-lg aspect-[3/4] bg-muted">
+                      {product.images && product.images[0] ? (
+                        <img 
+                          src={product.images[0]} 
+                          alt={product.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-muted">
+                          <span className="text-muted-foreground">No image</span>
+                        </div>
+                      )}
+                      {product.discount_percentage > 0 && (
+                        <Badge className="absolute top-4 left-4 bg-destructive text-destructive-foreground">
+                          {product.discount_percentage}% OFF
+                        </Badge>
+                      )}
+                      {product.is_new && (
+                        <Badge className="absolute top-4 right-4 bg-accent">New</Badge>
                       )}
                     </div>
                   </Link>
-                </CardContent>
-              <CardFooter className="p-4 pt-0 flex gap-2">
-                <Button 
-                  className="flex-1" 
-                  variant="default"
-                  onClick={() => handleAddToCart(product)}
-                >
-                  <ShoppingCart className="mr-2 h-4 w-4" />
-                  Add to Cart
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => toggleWishlist(product.id)}
-                  className={isInWishlist(product.id) ? "text-primary" : ""}
-                >
-                  <Heart className={`h-4 w-4 ${isInWishlist(product.id) ? "fill-current" : ""}`} />
-                </Button>
-              </CardFooter>
-              </Card>
+                  <CardContent className="p-4">
+                    <Link to={`/product/${product.id}`}>
+                      <Badge variant="secondary" className="mb-2">{product.category?.name || 'Uncategorized'}</Badge>
+                      <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">
+                        {product.name}
+                      </h3>
+                      <div className="flex items-center gap-2 mb-2">
+                        <StarRating rating={product.rating || 0} size="sm" />
+                        <span className="text-xs text-muted-foreground">({product.review_count || 0})</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-lg font-bold text-primary">PKR {product.price.toLocaleString()}</p>
+                        {product.discount_percentage > 0 && product.original_price > product.price && (
+                          <p className="text-sm text-muted-foreground line-through">
+                            PKR {product.original_price.toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                  </CardContent>
+                  <CardFooter className="p-4 pt-0 flex gap-2">
+                    <Button 
+                      className="flex-1" 
+                      variant="default"
+                      onClick={() => handleAddToCart(product)}
+                    >
+                      <ShoppingCart className="mr-2 h-4 w-4" />
+                      Add to Cart
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => toggleWishlist(product.id)}
+                      className={isInWishlist(product.id) ? "text-primary" : ""}
+                    >
+                      <Heart className={`h-4 w-4 ${isInWishlist(product.id) ? "fill-current" : ""}`} />
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         )}
 
         {/* Loading More Indicator */}
@@ -392,8 +447,13 @@ const Shop = () => {
           </div>
         )}
 
-        {filteredProducts.length === 0 && (
-          <div className="text-center py-16">
+        {filteredProducts.length === 0 && !loading && (
+          <motion.div 
+            className="text-center py-16"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4 }}
+          >
             <p className="text-xl text-muted-foreground">No products found matching your filters.</p>
             <Button 
               variant="default" 
@@ -402,9 +462,9 @@ const Shop = () => {
             >
               Clear All Filters
             </Button>
-          </div>
+          </motion.div>
         )}
-      </div>
+      </motion.div>
 
       <Footer />
     </div>

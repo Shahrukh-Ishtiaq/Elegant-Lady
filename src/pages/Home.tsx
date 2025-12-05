@@ -4,11 +4,13 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useCart } from "@/contexts/CartContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, ArrowRight } from "lucide-react";
+import { Sparkles, ArrowRight, Loader2, CheckCircle } from "lucide-react";
+import { toast } from "sonner";
 import heroImage from "@/assets/hero-lingerie.jpg";
 
 interface Category {
@@ -31,6 +33,8 @@ const Home = () => {
   const { cart } = useCart();
   const [categories, setCategories] = useState<Category[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [subscribeEmail, setSubscribeEmail] = useState("");
+  const [isSubscribing, setIsSubscribing] = useState(false);
   const { scrollY } = useScroll();
   const heroY = useTransform(scrollY, [0, 500], [0, 150]);
   const heroOpacity = useTransform(scrollY, [0, 300], [1, 0.3]);
@@ -47,6 +51,40 @@ const Home = () => {
     };
     fetchData();
   }, []);
+
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!subscribeEmail || !subscribeEmail.includes('@')) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+
+    setIsSubscribing(true);
+    try {
+      const { error } = await supabase
+        .from('subscribers')
+        .insert({ email: subscribeEmail.toLowerCase().trim() });
+
+      if (error) {
+        if (error.code === '23505') {
+          toast.info("You're already subscribed!");
+        } else {
+          throw error;
+        }
+      } else {
+        toast.success("Thank you for subscribing! 🎉", {
+          description: "You'll receive updates on new arrivals and exclusive offers."
+        });
+        setSubscribeEmail("");
+      }
+    } catch (error) {
+      console.error("Subscribe error:", error);
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setIsSubscribing(false);
+    }
+  };
 
   const activePromo = promotions[0];
 
@@ -227,7 +265,7 @@ const Home = () => {
         </div>
       </motion.section>
 
-      {/* CTA Banner */}
+      {/* CTA Banner / Subscribe */}
       <motion.section 
         className="container mx-auto px-4 py-16"
         initial={{ opacity: 0, y: 50 }}
@@ -248,14 +286,30 @@ const Home = () => {
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto relative">
             Sign up for exclusive offers, style tips, and be the first to know about new arrivals.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto relative">
-            <input 
+          <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto relative">
+            <Input 
               type="email" 
               placeholder="Your email address" 
+              value={subscribeEmail}
+              onChange={(e) => setSubscribeEmail(e.target.value)}
               className="flex-1 px-4 py-3 rounded-md border border-border bg-background focus:ring-2 focus:ring-primary/20 transition-all"
+              required
+              disabled={isSubscribing}
             />
-            <Button variant="default" size="lg">Subscribe</Button>
-          </div>
+            <Button type="submit" variant="default" size="lg" disabled={isSubscribing}>
+              {isSubscribing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Subscribing...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Subscribe
+                </>
+              )}
+            </Button>
+          </form>
         </div>
       </motion.section>
 
