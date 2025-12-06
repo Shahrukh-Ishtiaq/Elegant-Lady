@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Shield, ShieldOff } from "lucide-react";
+import { Loader2, Shield, ShieldOff, Mail, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -14,6 +14,7 @@ interface Profile {
   full_name: string | null;
   phone: string | null;
   city: string | null;
+  email: string | null;
   created_at: string;
 }
 
@@ -22,9 +23,15 @@ interface UserRole {
   role: "admin" | "moderator" | "user";
 }
 
+interface AuthUser {
+  id: string;
+  email: string;
+}
+
 export const AdminUsers = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+  const [userEmails, setUserEmails] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -117,7 +124,7 @@ export const AdminUsers = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>User</TableHead>
-                  <TableHead>Phone</TableHead>
+                  <TableHead>Contact</TableHead>
                   <TableHead>City</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Joined</TableHead>
@@ -134,12 +141,30 @@ export const AdminUsers = () => {
                           <p className="font-medium">
                             {profile.full_name || "No name"}
                           </p>
-                          <p className="text-sm text-muted-foreground">
-                            {profile.user_id.slice(0, 8)}...
+                          <p className="text-xs text-muted-foreground">
+                            ID: {profile.user_id.slice(0, 8)}...
                           </p>
                         </div>
                       </TableCell>
-                      <TableCell>{profile.phone || "-"}</TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          {profile.email && (
+                            <div className="flex items-center gap-1 text-sm">
+                              <Mail className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-xs">{profile.email}</span>
+                            </div>
+                          )}
+                          {profile.phone && (
+                            <div className="flex items-center gap-1 text-sm">
+                              <Phone className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-xs">{profile.phone}</span>
+                            </div>
+                          )}
+                          {!profile.email && !profile.phone && (
+                            <span className="text-xs text-muted-foreground">No contact info</span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>{profile.city || "-"}</TableCell>
                       <TableCell>
                         <Badge variant={role === "admin" ? "default" : "secondary"}>

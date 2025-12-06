@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useCart } from "@/contexts/CartContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, ArrowRight, Loader2, CheckCircle } from "lucide-react";
+import { Sparkles, ArrowRight, Loader2, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import heroImage from "@/assets/hero-lingerie.jpg";
 
@@ -29,28 +29,59 @@ interface Promotion {
   is_active: boolean;
 }
 
+interface Product {
+  id: string;
+  name: string;
+  images: string[] | null;
+}
+
+// Hero images for slideshow
+const heroImages = [
+  heroImage,
+];
+
 const Home = () => {
   const { cart } = useCart();
   const [categories, setCategories] = useState<Category[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [subscribeEmail, setSubscribeEmail] = useState("");
   const [isSubscribing, setIsSubscribing] = useState(false);
+  const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
   const { scrollY } = useScroll();
   const heroY = useTransform(scrollY, [0, 500], [0, 150]);
   const heroOpacity = useTransform(scrollY, [0, 300], [1, 0.3]);
 
   useEffect(() => {
     const fetchData = async () => {
-      const [categoriesRes, promotionsRes] = await Promise.all([
+      const [categoriesRes, promotionsRes, productsRes] = await Promise.all([
         supabase.from('categories').select('*').order('name'),
-        supabase.from('promotions').select('*').eq('is_active', true)
+        supabase.from('promotions').select('*').eq('is_active', true),
+        supabase.from('products').select('id, name, images').eq('is_featured', true).limit(5)
       ]);
       
       if (categoriesRes.data) setCategories(categoriesRes.data);
       if (promotionsRes.data) setPromotions(promotionsRes.data);
+      if (productsRes.data) setFeaturedProducts(productsRes.data);
     };
     fetchData();
   }, []);
+
+  // Auto-advance hero slideshow with product images
+  useEffect(() => {
+    const allImages = [
+      heroImage,
+      ...featuredProducts.filter(p => p.images?.[0]).map(p => p.images![0])
+    ];
+    
+    if (allImages.length <= 1) return;
+    
+    const interval = setInterval(() => {
+      setCurrentHeroIndex(prev => (prev + 1) % allImages.length);
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, [featuredProducts]);
 
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,6 +118,20 @@ const Home = () => {
   };
 
   const activePromo = promotions[0];
+
+  // Combine hero image with featured product images for slideshow
+  const allHeroImages = [
+    heroImage,
+    ...featuredProducts.filter(p => p.images?.[0]).map(p => p.images![0])
+  ];
+
+  const nextSlide = useCallback(() => {
+    setCurrentHeroIndex(prev => (prev + 1) % allHeroImages.length);
+  }, [allHeroImages.length]);
+
+  const prevSlide = useCallback(() => {
+    setCurrentHeroIndex(prev => (prev - 1 + allHeroImages.length) % allHeroImages.length);
+  }, [allHeroImages.length]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -137,19 +182,64 @@ const Home = () => {
         </motion.div>
       )}
 
-      {/* Hero Section with Parallax */}
-      <section className="relative h-[600px] overflow-hidden">
-        <motion.div 
-          style={{ y: heroY, opacity: heroOpacity }}
-          className="absolute inset-0"
-        >
-          <img 
-            src={heroImage} 
-            alt="Elegant Lady Lingerie" 
-            className="w-full h-full object-cover scale-110"
-          />
-        </motion.div>
-        <div className="absolute inset-0 bg-gradient-to-r from-background/80 to-transparent flex items-center">
+      {/* Hero Section with Auto-Sliding Images */}
+      <section className="relative h-[600px] md:h-[700px] overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.div 
+            key={currentHeroIndex}
+            initial={{ opacity: 0, scale: 1.1 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.7 }}
+            style={{ y: heroY }}
+            className="absolute inset-0"
+          >
+            <img 
+              src={allHeroImages[currentHeroIndex]} 
+              alt="Elegant Lady Lingerie" 
+              className="w-full h-full object-cover"
+            />
+          </motion.div>
+        </AnimatePresence>
+        
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/50 to-transparent" />
+        
+        {/* Navigation Arrows */}
+        {allHeroImages.length > 1 && (
+          <>
+            <button 
+              onClick={prevSlide}
+              className="absolute left-4 top-1/2 -translate-y-1/2 bg-background/50 hover:bg-background/80 p-3 rounded-full transition-all z-10"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+            <button 
+              onClick={nextSlide}
+              className="absolute right-4 top-1/2 -translate-y-1/2 bg-background/50 hover:bg-background/80 p-3 rounded-full transition-all z-10"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
+            
+            {/* Slide Indicators */}
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+              {allHeroImages.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentHeroIndex(index)}
+                  className={`w-3 h-3 rounded-full transition-all ${
+                    index === currentHeroIndex 
+                      ? 'bg-primary w-8' 
+                      : 'bg-background/50 hover:bg-background/80'
+                  }`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+        
+        {/* Hero Content */}
+        <div className="absolute inset-0 flex items-center">
           <div className="container mx-auto px-4">
             <motion.div 
               className="max-w-xl space-y-6"
@@ -157,11 +247,23 @@ const Home = () => {
               animate="visible"
               variants={containerVariants}
             >
+              <motion.div 
+                variants={itemVariants}
+                className="inline-block"
+              >
+                <Badge variant="secondary" className="mb-4 text-sm px-4 py-1">
+                  ✨ Premium Collection
+                </Badge>
+              </motion.div>
               <motion.h1 
                 variants={itemVariants}
-                className="text-5xl md:text-6xl font-bold leading-tight"
+                className="text-5xl md:text-7xl font-bold leading-tight"
               >
-                Seamless comfort anytime
+                <span className="bg-gradient-romantic bg-clip-text text-transparent">
+                  Seamless
+                </span>
+                <br />
+                comfort anytime
               </motion.h1>
               <motion.p 
                 variants={itemVariants}
@@ -169,11 +271,16 @@ const Home = () => {
               >
                 Discover comfort, confidence, and style in every piece.
               </motion.p>
-              <motion.div variants={itemVariants}>
+              <motion.div variants={itemVariants} className="flex gap-4">
                 <Link to="/shop">
                   <Button variant="hero" size="xl" className="shadow-elegant group">
                     Shop Now
                     <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </Link>
+                <Link to="/shop?featured=true">
+                  <Button variant="outline" size="xl">
+                    View Collection
                   </Button>
                 </Link>
               </motion.div>
