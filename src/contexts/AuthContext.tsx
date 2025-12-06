@@ -31,6 +31,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (session?.user) {
           setTimeout(() => {
             checkAdminRole(session.user.id);
+            // Update email in profile for admin display
+            updateProfileEmail(session.user.id, session.user.email);
           }, 0);
         } else {
           setIsAdmin(false);
@@ -44,6 +46,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
         checkAdminRole(session.user.id);
+        updateProfileEmail(session.user.id, session.user.email);
       }
       setLoading(false);
     });
@@ -63,6 +66,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsAdmin(!!data && !error);
     } catch {
       setIsAdmin(false);
+    }
+  };
+
+  const updateProfileEmail = async (userId: string, email: string | undefined) => {
+    if (!email) return;
+    
+    try {
+      await supabase
+        .from('profiles')
+        .update({ email })
+        .eq('user_id', userId);
+    } catch (error) {
+      // Silently fail - email in profile is optional
+      console.log("Could not update profile email:", error);
     }
   };
 
