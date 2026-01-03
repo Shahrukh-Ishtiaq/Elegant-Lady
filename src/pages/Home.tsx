@@ -238,7 +238,7 @@ const Home = () => {
           </>
         )}
         
-        {/* Hero Content */}
+      {/* Hero Content */}
         <div className="absolute inset-0 flex items-center">
           <div className="container mx-auto px-4">
             <motion.div 
@@ -251,35 +251,46 @@ const Home = () => {
                 variants={itemVariants}
                 className="inline-block"
               >
-                <Badge variant="secondary" className="mb-4 text-sm px-4 py-1">
+                <Badge variant="secondary" className="mb-4 text-sm px-4 py-1 bg-primary/90 text-primary-foreground border-none">
                   ✨ Premium Collection
                 </Badge>
               </motion.div>
               <motion.h1 
                 variants={itemVariants}
-                className="text-5xl md:text-7xl font-bold leading-tight"
+                className="text-5xl md:text-7xl font-bold leading-tight drop-shadow-lg"
               >
-                <span className="bg-gradient-romantic bg-clip-text text-transparent">
+                <span 
+                  className="text-primary font-extrabold"
+                  style={{ 
+                    textShadow: '2px 2px 4px rgba(0,0,0,0.3), 0 0 40px rgba(255,255,255,0.5)' 
+                  }}
+                >
                   Seamless
                 </span>
                 <br />
-                comfort anytime
+                <span 
+                  className="text-foreground font-bold"
+                  style={{ textShadow: '1px 1px 3px rgba(0,0,0,0.2)' }}
+                >
+                  comfort anytime
+                </span>
               </motion.h1>
               <motion.p 
                 variants={itemVariants}
-                className="text-xl text-muted-foreground"
+                className="text-xl font-medium text-foreground/90 drop-shadow-sm"
+                style={{ textShadow: '1px 1px 2px rgba(255,255,255,0.8)' }}
               >
                 Discover comfort, confidence, and style in every piece.
               </motion.p>
               <motion.div variants={itemVariants} className="flex gap-4">
                 <Link to="/shop">
-                  <Button variant="hero" size="xl" className="shadow-elegant group">
+                  <Button variant="hero" size="xl" className="shadow-elegant group font-bold">
                     Shop Now
                     <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </Link>
                 <Link to="/shop?featured=true">
-                  <Button variant="outline" size="xl">
+                  <Button variant="outline" size="xl" className="bg-background/80 backdrop-blur-sm font-semibold border-2">
                     View Collection
                   </Button>
                 </Link>

@@ -6,9 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, Bell, Package, Eye, MapPin, Phone, Mail, CreditCard, Calendar } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Loader2, Bell, Package, Eye, MapPin, Phone, Mail, CreditCard, Calendar, Filter, CalendarDays } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, isToday, isYesterday, parseISO, startOfDay, endOfDay } from "date-fns";
 
 interface OrderItem {
   name: string;
@@ -38,12 +39,18 @@ interface Order {
   created_at: string;
 }
 
+type DateFilter = "all" | "today" | "yesterday" | "custom";
+
 export const AdminOrders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [newOrderCount, setNewOrderCount] = useState(0);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [dateFilter, setDateFilter] = useState<DateFilter>("all");
+  const [customDate, setCustomDate] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   useEffect(() => {
     fetchOrders();
@@ -88,6 +95,31 @@ export const AdminOrders = () => {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  // Apply filters whenever orders, dateFilter, customDate, or statusFilter changes
+  useEffect(() => {
+    let filtered = [...orders];
+
+    // Apply date filter
+    if (dateFilter === "today") {
+      filtered = filtered.filter(order => isToday(parseISO(order.created_at)));
+    } else if (dateFilter === "yesterday") {
+      filtered = filtered.filter(order => isYesterday(parseISO(order.created_at)));
+    } else if (dateFilter === "custom" && customDate) {
+      const selectedDate = parseISO(customDate);
+      filtered = filtered.filter(order => {
+        const orderDate = parseISO(order.created_at);
+        return orderDate >= startOfDay(selectedDate) && orderDate <= endOfDay(selectedDate);
+      });
+    }
+
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(order => order.status === statusFilter);
+    }
+
+    setFilteredOrders(filtered);
+  }, [orders, dateFilter, customDate, statusFilter]);
 
   const playNotificationSound = () => {
     try {
@@ -178,6 +210,23 @@ export const AdminOrders = () => {
     }
   };
 
+  const getDateLabel = (dateStr: string) => {
+    const date = parseISO(dateStr);
+    if (isToday(date)) return "Today";
+    if (isYesterday(date)) return "Yesterday";
+    return format(date, "MMM dd, yyyy");
+  };
+
+  // Group orders by date
+  const groupedOrders = filteredOrders.reduce((acc, order) => {
+    const dateKey = format(parseISO(order.created_at), "yyyy-MM-dd");
+    if (!acc[dateKey]) {
+      acc[dateKey] = [];
+    }
+    acc[dateKey].push(order);
+    return acc;
+  }, {} as Record<string, Order[]>);
+
   if (loading) {
     return (
       <div className="flex justify-center py-8">
@@ -188,130 +237,215 @@ export const AdminOrders = () => {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div className="flex items-center gap-3">
-          <CardTitle>Orders ({orders.length})</CardTitle>
-          {newOrderCount > 0 && (
-            <button
-              onClick={clearNewOrderNotification}
-              className="relative animate-bounce"
-            >
-              <Bell className="h-6 w-6 text-primary" />
-              <span className="absolute -top-1 -right-1 h-5 w-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center font-bold">
-                {newOrderCount}
-              </span>
-            </button>
-          )}
+      <CardHeader className="space-y-4">
+        <div className="flex flex-row items-center justify-between">
+          <div className="flex items-center gap-3">
+            <CardTitle>Orders ({filteredOrders.length})</CardTitle>
+            {newOrderCount > 0 && (
+              <button
+                onClick={clearNewOrderNotification}
+                className="relative animate-bounce"
+              >
+                <Bell className="h-6 w-6 text-primary" />
+                <span className="absolute -top-1 -right-1 h-5 w-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center font-bold">
+                  {newOrderCount}
+                </span>
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            Live updates enabled
+          </div>
         </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-          Live updates enabled
+
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3 items-center">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Filters:</span>
+          </div>
+
+          {/* Date Filter */}
+          <Select value={dateFilter} onValueChange={(value: DateFilter) => setDateFilter(value)}>
+            <SelectTrigger className="w-36">
+              <CalendarDays className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Date" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Dates</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="yesterday">Yesterday</SelectItem>
+              <SelectItem value="custom">Custom Date</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {dateFilter === "custom" && (
+            <Input
+              type="date"
+              value={customDate}
+              onChange={(e) => setCustomDate(e.target.value)}
+              className="w-40"
+            />
+          )}
+
+          {/* Status Filter */}
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="processing">Processing</SelectItem>
+              <SelectItem value="shipped">Shipped</SelectItem>
+              <SelectItem value="delivered">Delivered</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {(dateFilter !== "all" || statusFilter !== "all") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setDateFilter("all");
+                setStatusFilter("all");
+                setCustomDate("");
+              }}
+            >
+              Clear Filters
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>
-        {orders.length === 0 ? (
+        {filteredOrders.length === 0 ? (
           <div className="text-center py-12">
             <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">No orders yet</p>
-            <p className="text-sm text-muted-foreground mt-1">New orders will appear here automatically</p>
+            <p className="text-muted-foreground">No orders found</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {dateFilter !== "all" || statusFilter !== "all" 
+                ? "Try adjusting your filters" 
+                : "New orders will appear here automatically"}
+            </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Order ID</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Payment</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {orders.map((order) => (
-                  <TableRow key={order.id} className={order.status === 'pending' ? 'bg-yellow-50/50' : ''}>
-                    <TableCell className="font-mono text-xs">
-                      #{order.id.slice(0, 8).toUpperCase()}
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        <p className="font-medium">
-                          {order.shipping_address?.firstName} {order.shipping_address?.lastName}
-                        </p>
-                        <p className="text-muted-foreground text-xs">
-                          {order.shipping_address?.email}
-                        </p>
-                        {order.shipping_address?.phone && (
-                          <p className="text-muted-foreground text-xs">
-                            {order.shipping_address.phone}
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="max-w-[150px]">
-                        {order.items?.slice(0, 2).map((item, idx) => (
-                          <p key={idx} className="text-sm truncate">
-                            {item.quantity}x {item.name}
-                          </p>
-                        ))}
-                        {order.items?.length > 2 && (
-                          <p className="text-xs text-muted-foreground">
-                            +{order.items.length - 2} more
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-semibold">
-                      PKR {Number(order.total).toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {order.payment_method === "cod" ? "COD" : "Card"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={order.status}
-                        onValueChange={(value) => updateOrderStatus(order.id, value)}
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue>
-                            <Badge className={getStatusColor(order.status)}>
-                              {order.status}
+          <div className="space-y-6">
+            {Object.entries(groupedOrders).map(([dateKey, dateOrders]) => (
+              <div key={dateKey} className="space-y-3">
+                {/* Date Header */}
+                <div className="flex items-center gap-2 sticky top-0 bg-background py-2 z-10">
+                  <Calendar className="h-4 w-4 text-primary" />
+                  <span className="font-semibold text-sm">
+                    {getDateLabel(dateOrders[0].created_at)}
+                  </span>
+                  <Badge variant="secondary" className="text-xs">
+                    {dateOrders.length} order{dateOrders.length > 1 ? 's' : ''}
+                  </Badge>
+                </div>
+
+                {/* Orders Table */}
+                <div className="overflow-x-auto border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Order ID</TableHead>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Items</TableHead>
+                        <TableHead>Total</TableHead>
+                        <TableHead>Payment</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Time</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {dateOrders.map((order) => (
+                        <TableRow key={order.id} className={order.status === 'pending' ? 'bg-yellow-50/50' : ''}>
+                          <TableCell className="font-mono text-xs">
+                            #{order.id.slice(0, 8).toUpperCase()}
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              <p className="font-medium">
+                                {order.shipping_address?.firstName} {order.shipping_address?.lastName}
+                              </p>
+                              <p className="text-muted-foreground text-xs">
+                                {order.shipping_address?.email}
+                              </p>
+                              {order.shipping_address?.phone && (
+                                <p className="text-muted-foreground text-xs">
+                                  {order.shipping_address.phone}
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="max-w-[150px]">
+                              {order.items?.slice(0, 2).map((item, idx) => (
+                                <p key={idx} className="text-sm truncate">
+                                  {item.quantity}x {item.name}
+                                </p>
+                              ))}
+                              {order.items?.length > 2 && (
+                                <p className="text-xs text-muted-foreground">
+                                  +{order.items.length - 2} more
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-semibold">
+                            PKR {Number(order.total).toLocaleString()}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {order.payment_method === "cod" ? "COD" : "Card"}
                             </Badge>
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="approved">Approved</SelectItem>
-                          <SelectItem value="processing">Processing</SelectItem>
-                          <SelectItem value="shipped">Shipped</SelectItem>
-                          <SelectItem value="delivered">Delivered</SelectItem>
-                          <SelectItem value="cancelled">Cancelled</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {format(new Date(order.created_at), "MMM dd, HH:mm")}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => viewOrderDetails(order)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={order.status}
+                              onValueChange={(value) => updateOrderStatus(order.id, value)}
+                            >
+                              <SelectTrigger className="w-32">
+                                <SelectValue>
+                                  <Badge className={getStatusColor(order.status)}>
+                                    {order.status}
+                                  </Badge>
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="approved">Approved</SelectItem>
+                                <SelectItem value="processing">Processing</SelectItem>
+                                <SelectItem value="shipped">Shipped</SelectItem>
+                                <SelectItem value="delivered">Delivered</SelectItem>
+                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {format(new Date(order.created_at), "HH:mm")}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => viewOrderDetails(order)}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </CardContent>
