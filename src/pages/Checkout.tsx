@@ -104,6 +104,23 @@ const Checkout = () => {
     setIsSubmitting(true);
 
     try {
+      // Check stock availability before placing order
+      for (const item of cart) {
+        const { data: product, error: stockError } = await supabase
+          .from("products")
+          .select("stock_quantity, in_stock, name")
+          .eq("id", item.id)
+          .single();
+
+        if (stockError) throw stockError;
+
+        if (!product.in_stock || product.stock_quantity < item.quantity) {
+          toast.error(`Sorry, "${product.name}" is no longer available in the requested quantity.`);
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const orderData = {
         user_id: user?.id || null,
         status: "pending",
@@ -133,6 +150,26 @@ const Checkout = () => {
       const { data, error } = await supabase.from("orders").insert(orderData).select().single();
 
       if (error) throw error;
+
+      // Update stock quantities after successful order
+      for (const item of cart) {
+        const { data: product } = await supabase
+          .from("products")
+          .select("stock_quantity")
+          .eq("id", item.id)
+          .single();
+
+        if (product) {
+          const newQuantity = product.stock_quantity - item.quantity;
+          await supabase
+            .from("products")
+            .update({
+              stock_quantity: newQuantity,
+              in_stock: newQuantity > 0,
+            })
+            .eq("id", item.id);
+        }
+      }
 
       // Send order confirmation email
       if (data?.id) {
