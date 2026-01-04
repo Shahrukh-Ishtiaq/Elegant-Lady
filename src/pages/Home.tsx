@@ -265,14 +265,14 @@ const Home = () => {
                     textShadow: '2px 2px 4px rgba(0,0,0,0.3), 0 0 40px rgba(255,255,255,0.5)' 
                   }}
                 >
-                  Seamless
+                  Delicate Details
                 </span>
                 <br />
                 <span 
                   className="text-foreground font-bold"
                   style={{ textShadow: '1px 1px 3px rgba(0,0,0,0.2)' }}
                 >
-                  comfort anytime
+                  Distinctive You.
                 </span>
               </motion.h1>
               <motion.p 
