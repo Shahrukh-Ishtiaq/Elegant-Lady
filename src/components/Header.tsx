@@ -174,7 +174,7 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
             </Link>
 
             {/* TEXT — aligned beside logo */}
-            <span className="font-semibold text-xl ml-10">Elegant Lady</span>
+            <span className="font-semibold text-xl ml-10">DAISY</span>
           </div>
 
           {/* DESKTOP NAVIGATION */}
