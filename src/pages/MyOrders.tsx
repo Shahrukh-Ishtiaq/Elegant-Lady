@@ -6,9 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, ArrowLeft } from "lucide-react";
+import { Package, ArrowLeft, Truck } from "lucide-react";
+import { OrderTrackingTimeline } from "@/components/OrderTrackingTimeline";
 
 interface OrderItem {
   id: string;
@@ -39,6 +41,8 @@ const MyOrders = () => {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [trackingOpen, setTrackingOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -77,6 +81,11 @@ const MyOrders = () => {
       fetchOrders();
     }
   }, [user]);
+
+  const openTracking = (order: Order) => {
+    setSelectedOrder(order);
+    setTrackingOpen(true);
+  };
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -162,9 +171,19 @@ const MyOrders = () => {
                         })}
                       </p>
                     </div>
-                    <Badge className={getStatusColor(order.status)}>
-                      {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge className={getStatusColor(order.status)}>
+                        {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openTracking(order)}
+                      >
+                        <Truck className="h-4 w-4 mr-1" />
+                        Track
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="p-6">
@@ -214,6 +233,32 @@ const MyOrders = () => {
           </div>
         )}
       </div>
+
+      {/* Order Tracking Modal */}
+      <Dialog open={trackingOpen} onOpenChange={setTrackingOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Truck className="h-5 w-5" />
+              Order Tracking
+            </DialogTitle>
+          </DialogHeader>
+          {selectedOrder && (
+            <div className="space-y-4">
+              <div className="text-center border-b pb-4">
+                <p className="text-sm text-muted-foreground">Order ID</p>
+                <p className="font-mono font-semibold">
+                  #{selectedOrder.id.slice(0, 8).toUpperCase()}
+                </p>
+              </div>
+              <OrderTrackingTimeline 
+                status={selectedOrder.status} 
+                createdAt={selectedOrder.created_at} 
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Footer />
     </div>

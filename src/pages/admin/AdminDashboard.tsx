@@ -6,7 +6,7 @@ import { Footer } from "@/components/Footer";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Package, ShoppingCart, Users, DollarSign, Sparkles, Mail, Bell, MessageSquare } from "lucide-react";
+import { Loader2, Package, ShoppingCart, Users, DollarSign, Sparkles, Mail, Bell, MessageSquare, Boxes } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminProducts } from "@/components/admin/AdminProducts";
 import { AdminOrders } from "@/components/admin/AdminOrders";
@@ -15,6 +15,7 @@ import { AdminUsers } from "@/components/admin/AdminUsers";
 import { AdminPromotions } from "@/components/admin/AdminPromotions";
 import { AdminSubscribers } from "@/components/admin/AdminSubscribers";
 import { AdminMessages } from "@/components/admin/AdminMessages";
+import { AdminInventory } from "@/components/admin/AdminInventory";
 import { toast } from "sonner";
 
 const AdminDashboard = () => {
@@ -259,7 +260,7 @@ const AdminDashboard = () => {
         {/* Main Content */}
         <motion.div variants={itemVariants}>
           <Tabs defaultValue="orders" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7 max-w-4xl">
+            <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 max-w-5xl">
               <TabsTrigger value="orders" className="flex items-center gap-1">
                 <ShoppingCart className="h-3 w-3" />
                 <span className="hidden sm:inline">Orders</span>
@@ -267,6 +268,10 @@ const AdminDashboard = () => {
               <TabsTrigger value="products">
                 <Package className="h-3 w-3 sm:mr-1" />
                 <span className="hidden sm:inline">Products</span>
+              </TabsTrigger>
+              <TabsTrigger value="inventory" className="flex items-center gap-1">
+                <Boxes className="h-3 w-3" />
+                <span className="hidden sm:inline">Inventory</span>
               </TabsTrigger>
               <TabsTrigger value="categories">Categories</TabsTrigger>
               <TabsTrigger value="promotions" className="flex items-center gap-1">
@@ -293,6 +298,10 @@ const AdminDashboard = () => {
 
             <TabsContent value="products">
               <AdminProducts />
+            </TabsContent>
+
+            <TabsContent value="inventory">
+              <AdminInventory />
             </TabsContent>
 
             <TabsContent value="categories">
