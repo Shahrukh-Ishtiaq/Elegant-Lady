@@ -88,7 +88,7 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
                         className=" w-auto object-contain"
                       />
                       <span className="-mt-20 text-lg font-semibold">
-                        Elegant Lady
+                        DAISY
                       </span>
                     </Link>
                   </SheetTitle>
