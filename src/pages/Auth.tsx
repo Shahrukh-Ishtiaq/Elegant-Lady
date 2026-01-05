@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,24 +28,73 @@ const Auth = () => {
   const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isProcessingOAuth, setIsProcessingOAuth] = useState(false);
   
-  const { user, signIn, signUp } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
+  // Handle OAuth callback and hash parameters
   useEffect(() => {
-    if (user && mode !== "reset") {
-      navigate("/");
-    }
-  }, [user, navigate, mode]);
+    const handleOAuthCallback = async () => {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get("access_token");
+      const type = hashParams.get("type");
+      const errorDescription = hashParams.get("error_description");
 
-  // Check for password reset token in URL
+      // Handle error from OAuth
+      if (errorDescription) {
+        toast.error(decodeURIComponent(errorDescription.replace(/\+/g, ' ')));
+        // Clear hash
+        window.history.replaceState(null, '', window.location.pathname);
+        return;
+      }
+
+      // Check for password reset token
+      if (type === "recovery") {
+        setMode("reset");
+        return;
+      }
+
+      // If there's an access token in the URL, we're returning from OAuth
+      if (accessToken) {
+        setIsProcessingOAuth(true);
+        try {
+          // Let Supabase handle the session from the URL
+          const { data, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.error('OAuth callback error:', error);
+            toast.error("Authentication failed. Please try again.");
+            setIsProcessingOAuth(false);
+            return;
+          }
+
+          if (data.session) {
+            // Clear the hash from URL
+            window.history.replaceState(null, '', window.location.pathname);
+            toast.success("Welcome to DAIZY!");
+            // Navigate to home
+            navigate("/", { replace: true });
+          }
+        } catch (error) {
+          console.error('OAuth processing error:', error);
+          toast.error("Something went wrong. Please try again.");
+        } finally {
+          setIsProcessingOAuth(false);
+        }
+      }
+    };
+
+    handleOAuthCallback();
+  }, [navigate]);
+
+  // Redirect if already authenticated
   useEffect(() => {
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const type = hashParams.get("type");
-    if (type === "recovery") {
-      setMode("reset");
+    if (!authLoading && !isProcessingOAuth && user && mode !== "reset") {
+      navigate("/", { replace: true });
     }
-  }, []);
+  }, [user, authLoading, navigate, mode, isProcessingOAuth]);
 
   const validateEmail = (email: string): { valid: boolean; message?: string } => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -82,19 +131,28 @@ const Auth = () => {
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
+      const redirectUrl = `${window.location.origin}/auth`;
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
         }
       });
       
       if (error) {
-        toast.error(error.message);
+        console.error('Google sign in error:', error);
+        toast.error(error.message || "Failed to sign in with Google");
+        setIsGoogleLoading(false);
       }
+      // Don't set loading to false here as we're redirecting
     } catch (error) {
-      toast.error("Failed to sign in with Google");
-    } finally {
+      console.error('Google sign in error:', error);
+      toast.error("Failed to sign in with Google. Please try again.");
       setIsGoogleLoading(false);
     }
   };
@@ -102,6 +160,25 @@ const Auth = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+
+    const { signIn, signUp } = await import("@/contexts/AuthContext").then(m => {
+      // Use the hook values directly
+      return { signIn: async (email: string, password: string) => {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        return { error: error as Error | null };
+      }, signUp: async (email: string, password: string, fullName: string) => {
+        const redirectUrl = `${window.location.origin}/`;
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: redirectUrl,
+            data: { full_name: fullName },
+          },
+        });
+        return { error: error as Error | null };
+      }};
+    });
 
     try {
       if (mode === "login") {
@@ -114,7 +191,7 @@ const Auth = () => {
           }
         } else {
           toast.success("Welcome back!");
-          navigate("/");
+          navigate("/", { replace: true });
         }
       } else if (mode === "signup") {
         // Validate email
@@ -145,8 +222,8 @@ const Auth = () => {
             toast.error(error.message);
           }
         } else {
-          toast.success("Account created successfully! Welcome to Elegant Lady.");
-          navigate("/");
+          toast.success("Account created successfully! Welcome to DAIZY.");
+          navigate("/", { replace: true });
         }
       } else if (mode === "forgot") {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -174,7 +251,7 @@ const Auth = () => {
           toast.error(error.message);
         } else {
           toast.success("Password updated successfully!");
-          navigate("/");
+          navigate("/", { replace: true });
         }
       }
     } catch (error) {
@@ -196,11 +273,25 @@ const Auth = () => {
   const getDescription = () => {
     switch (mode) {
       case "login": return "Sign in to your account to continue";
-      case "signup": return "Join Elegant Lady for exclusive access";
+      case "signup": return "Join DAIZY for exclusive access";
       case "forgot": return "Enter your email to receive a reset link";
       case "reset": return "Enter your new password";
     }
   };
+
+  // Show loading state while processing OAuth
+  if (isProcessingOAuth || (authLoading && window.location.hash.includes('access_token'))) {
+    return (
+      <div className="min-h-screen bg-gradient-soft flex items-center justify-center p-4">
+        <Card className="border-none shadow-elegant p-8">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Completing sign in...</p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <motion.div 
@@ -218,10 +309,10 @@ const Auth = () => {
         >
           <Link to="/">
             <h1 className="text-4xl font-bold bg-gradient-romantic bg-clip-text text-transparent mb-2">
-              Elegant Lady
+              DAIZY
             </h1>
           </Link>
-          <p className="text-muted-foreground">Seamless comfort anytime</p>
+          <p className="text-muted-foreground">Delicate Details, Distinctive You</p>
         </motion.div>
 
         <motion.div
