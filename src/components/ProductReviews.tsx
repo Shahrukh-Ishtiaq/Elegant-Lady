@@ -36,6 +36,46 @@ export const ProductReviews = ({ productId, productRating, reviewCount }: Produc
 
   useEffect(() => {
     fetchReviews();
+    
+    // Set up realtime subscription for instant review updates
+    const channel = supabase
+      .channel(`reviews-${productId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'reviews',
+          filter: `product_id=eq.${productId}`
+        },
+        (payload) => {
+          console.log('Review change received:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            const newReview = payload.new as Review;
+            setReviews(prev => {
+              // Avoid duplicates
+              if (prev.some(r => r.id === newReview.id)) return prev;
+              return [newReview, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedReview = payload.new as Review;
+            setReviews(prev => prev.map(r => 
+              r.id === updatedReview.id ? updatedReview : r
+            ));
+          } else if (payload.eventType === 'DELETE') {
+            const deletedReview = payload.old as Review;
+            setReviews(prev => prev.filter(r => r.id !== deletedReview.id));
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('Reviews subscription status:', status);
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [productId]);
 
   const fetchReviews = async () => {
@@ -63,27 +103,51 @@ export const ProductReviews = ({ productId, productRating, reviewCount }: Produc
       return;
     }
 
+    if (newReview.comment.trim().length < 10) {
+      toast.error("Please write at least 10 characters for your review");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const { error } = await supabase
+      const reviewData = {
+        product_id: productId,
+        user_id: user?.id || null,
+        user_name: newReview.name.trim(),
+        rating: newReview.rating,
+        comment: newReview.comment.trim(),
+        helpful_count: 0,
+      };
+
+      const { data, error } = await supabase
         .from('reviews')
-        .insert({
-          product_id: productId,
-          user_id: user?.id || null,
-          user_name: newReview.name.trim(),
-          rating: newReview.rating,
-          comment: newReview.comment.trim(),
+        .insert(reviewData)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Review insert error:', error);
+        throw error;
+      }
+
+      // Optimistically add the review to local state immediately
+      if (data) {
+        setReviews(prev => {
+          if (prev.some(r => r.id === data.id)) return prev;
+          return [data, ...prev];
         });
+      }
 
-      if (error) throw error;
-
-      toast.success("Review submitted successfully!");
+      toast.success("Review submitted successfully! Thank you for your feedback.");
       setNewReview({ name: "", rating: 5, comment: "" });
       setShowForm(false);
-      fetchReviews();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting review:', error);
-      toast.error("Failed to submit review. Please try again.");
+      if (error.code === '42501') {
+        toast.error("Permission denied. Please try logging in first.");
+      } else {
+        toast.error("Failed to submit review. Please try again.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -91,19 +155,22 @@ export const ProductReviews = ({ productId, productRating, reviewCount }: Produc
 
   const handleHelpful = async (reviewId: string, currentCount: number) => {
     try {
+      const newCount = (currentCount || 0) + 1;
       const { error } = await supabase
         .from('reviews')
-        .update({ helpful_count: currentCount + 1 })
+        .update({ helpful_count: newCount })
         .eq('id', reviewId);
 
       if (error) throw error;
       
+      // Optimistic update
       setReviews(reviews.map(r => 
-        r.id === reviewId ? { ...r, helpful_count: r.helpful_count + 1 } : r
+        r.id === reviewId ? { ...r, helpful_count: newCount } : r
       ));
       toast.success("Thanks for your feedback!");
     } catch (error) {
       console.error('Error updating helpful count:', error);
+      toast.error("Could not update. Please try again.");
     }
   };
 
@@ -218,11 +285,14 @@ export const ProductReviews = ({ productId, productRating, reviewCount }: Produc
                         <Textarea
                           value={newReview.comment}
                           onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
-                          placeholder="Share your experience with this product..."
+                          placeholder="Share your experience with this product... (minimum 10 characters)"
                           rows={4}
                           maxLength={500}
                           disabled={submitting}
                         />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {newReview.comment.length}/500 characters
+                        </p>
                       </div>
                       <div className="flex gap-2">
                         <Button type="submit" disabled={submitting}>
@@ -286,11 +356,11 @@ export const ProductReviews = ({ productId, productRating, reviewCount }: Produc
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleHelpful(review.id, review.helpful_count)}
+                      onClick={() => handleHelpful(review.id, review.helpful_count || 0)}
                       className="text-muted-foreground hover:text-primary"
                     >
                       <ThumbsUp className="h-4 w-4 mr-1" />
-                      Helpful ({review.helpful_count})
+                      Helpful ({review.helpful_count || 0})
                     </Button>
                   </CardContent>
                 </Card>

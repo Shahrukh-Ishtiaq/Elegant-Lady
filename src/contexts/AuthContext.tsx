@@ -24,29 +24,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log('Auth state change:', event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Defer role check to avoid deadlock
+        // Defer role check and profile update to avoid deadlock
         if (session?.user) {
           setTimeout(() => {
             checkAdminRole(session.user.id);
-            // Update email in profile for admin display
-            updateProfileEmail(session.user.id, session.user.email);
+            // Ensure email is saved to profile for admin display
+            ensureProfileEmail(session.user.id, session.user.email, session.user.user_metadata?.full_name);
           }, 0);
         } else {
           setIsAdmin(false);
+        }
+        
+        // Set loading to false after state change is handled
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+          setLoading(false);
         }
       }
     );
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session check:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
         checkAdminRole(session.user.id);
-        updateProfileEmail(session.user.id, session.user.email);
+        ensureProfileEmail(session.user.id, session.user.email, session.user.user_metadata?.full_name);
       }
       setLoading(false);
     });
@@ -69,17 +76,54 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const updateProfileEmail = async (userId: string, email: string | undefined) => {
+  const ensureProfileEmail = async (userId: string, email: string | undefined, fullName?: string) => {
     if (!email) return;
     
     try {
-      await supabase
+      // First check if profile exists
+      const { data: existingProfile, error: fetchError } = await supabase
         .from('profiles')
-        .update({ email })
-        .eq('user_id', userId);
+        .select('id, email, full_name')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error("Error checking profile:", fetchError);
+        return;
+      }
+
+      if (existingProfile) {
+        // Update email if it's different or missing
+        if (!existingProfile.email || existingProfile.email !== email) {
+          const updateData: { email: string; full_name?: string } = { email };
+          if (fullName && !existingProfile.full_name) {
+            updateData.full_name = fullName;
+          }
+          
+          await supabase
+            .from('profiles')
+            .update(updateData)
+            .eq('user_id', userId);
+          console.log("Profile email updated");
+        }
+      } else {
+        // Create profile if it doesn't exist (for OAuth users)
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            user_id: userId,
+            email: email,
+            full_name: fullName || null,
+          });
+        
+        if (insertError && insertError.code !== '23505') {
+          console.error("Error creating profile:", insertError);
+        } else {
+          console.log("Profile created for user");
+        }
+      }
     } catch (error) {
-      // Silently fail - email in profile is optional
-      console.log("Could not update profile email:", error);
+      console.error("Could not ensure profile email:", error);
     }
   };
 
