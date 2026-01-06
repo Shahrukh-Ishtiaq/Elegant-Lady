@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -11,8 +11,9 @@ import { toast } from "sonner";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { ShoppingBag, Loader2 } from "lucide-react";
+import { ShoppingBag, Loader2, AlertCircle } from "lucide-react";
 import { z } from "zod";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Validation schema for checkout form
 const checkoutSchema = z.object({
@@ -29,7 +30,7 @@ const checkoutSchema = z.object({
 const Checkout = () => {
   const navigate = useNavigate();
   const { cart, clearCart } = useCart();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [paymentMethod, setPaymentMethod] = useState("cod");
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -43,6 +44,13 @@ const Checkout = () => {
     state: "",
     zip: "",
   });
+
+  // Update email when user loads
+  useEffect(() => {
+    if (user?.email) {
+      setFormData(prev => ({ ...prev, email: user.email || "" }));
+    }
+  }, [user?.email]);
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const shipping = subtotal > 5000 ? 0 : 250;
@@ -193,6 +201,52 @@ const Checkout = () => {
       setIsSubmitting(false);
     }
   };
+
+  // Show loading state while auth is loading
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // If user is not logged in and has items in cart, show login prompt
+  if (!user && cart.length > 0) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container mx-auto px-4 py-16">
+          <div className="max-w-md mx-auto text-center space-y-6">
+            <AlertCircle className="h-16 w-16 mx-auto text-primary" />
+            <h2 className="text-3xl font-bold">Sign In Required</h2>
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Please sign up or log in to continue with your order.
+              </AlertDescription>
+            </Alert>
+            <p className="text-muted-foreground">
+              Create an account or sign in to complete your purchase. Your cart items will be saved.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link to="/auth">
+                <Button size="lg" className="w-full sm:w-auto">
+                  Sign In / Sign Up
+                </Button>
+              </Link>
+              <Link to="/shop">
+                <Button variant="outline" size="lg" className="w-full sm:w-auto">
+                  Continue Shopping
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   if (cart.length === 0) {
     return (

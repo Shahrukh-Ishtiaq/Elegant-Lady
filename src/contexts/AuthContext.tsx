@@ -32,17 +32,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (session?.user) {
           setTimeout(() => {
             checkAdminRole(session.user.id);
-            // Ensure email is saved to profile for admin display
-            ensureProfileEmail(session.user.id, session.user.email, session.user.user_metadata?.full_name);
+            // Ensure email and phone are saved to profile for admin display
+            ensureProfileData(
+              session.user.id, 
+              session.user.email, 
+              session.user.user_metadata?.full_name,
+              session.user.phone
+            );
           }, 0);
         } else {
           setIsAdmin(false);
         }
         
         // Set loading to false after state change is handled
-        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     );
 
@@ -53,7 +56,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
         checkAdminRole(session.user.id);
-        ensureProfileEmail(session.user.id, session.user.email, session.user.user_metadata?.full_name);
+        ensureProfileData(
+          session.user.id, 
+          session.user.email, 
+          session.user.user_metadata?.full_name,
+          session.user.phone
+        );
       }
       setLoading(false);
     });
@@ -76,14 +84,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const ensureProfileEmail = async (userId: string, email: string | undefined, fullName?: string) => {
+  const ensureProfileData = async (
+    userId: string, 
+    email: string | undefined, 
+    fullName?: string,
+    phone?: string
+  ) => {
     if (!email) return;
     
     try {
       // First check if profile exists
       const { data: existingProfile, error: fetchError } = await supabase
         .from('profiles')
-        .select('id, email, full_name')
+        .select('id, email, full_name, phone')
         .eq('user_id', userId)
         .maybeSingle();
       
@@ -93,18 +106,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (existingProfile) {
-        // Update email if it's different or missing
+        // Update profile if email is different or missing
+        const updateData: { email?: string; full_name?: string; phone?: string } = {};
+        
         if (!existingProfile.email || existingProfile.email !== email) {
-          const updateData: { email: string; full_name?: string } = { email };
-          if (fullName && !existingProfile.full_name) {
-            updateData.full_name = fullName;
-          }
-          
+          updateData.email = email;
+        }
+        if (fullName && !existingProfile.full_name) {
+          updateData.full_name = fullName;
+        }
+        if (phone && !existingProfile.phone) {
+          updateData.phone = phone;
+        }
+        
+        if (Object.keys(updateData).length > 0) {
           await supabase
             .from('profiles')
             .update(updateData)
             .eq('user_id', userId);
-          console.log("Profile email updated");
+          console.log("Profile updated with:", updateData);
         }
       } else {
         // Create profile if it doesn't exist (for OAuth users)
@@ -114,6 +134,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             user_id: userId,
             email: email,
             full_name: fullName || null,
+            phone: phone || null,
           });
         
         if (insertError && insertError.code !== '23505') {
@@ -123,7 +144,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     } catch (error) {
-      console.error("Could not ensure profile email:", error);
+      console.error("Could not ensure profile data:", error);
     }
   };
 

@@ -196,7 +196,7 @@ const Home = () => {
           >
             <img 
               src={allHeroImages[currentHeroIndex]} 
-              alt="Elegant Lady Lingerie" 
+              alt="DAISY Lingerie" 
               className="w-full h-full object-cover"
             />
           </motion.div>
