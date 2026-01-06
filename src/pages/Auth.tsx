@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,7 +32,6 @@ const Auth = () => {
   
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
 
   // Handle OAuth callback and hash parameters
   useEffect(() => {
@@ -45,7 +44,6 @@ const Auth = () => {
       // Handle error from OAuth
       if (errorDescription) {
         toast.error(decodeURIComponent(errorDescription.replace(/\+/g, ' ')));
-        // Clear hash
         window.history.replaceState(null, '', window.location.pathname);
         return;
       }
@@ -73,7 +71,7 @@ const Auth = () => {
           if (data.session) {
             // Clear the hash from URL
             window.history.replaceState(null, '', window.location.pathname);
-            toast.success("Welcome to DAIZY!");
+            toast.success("Welcome to DAISY!");
             // Navigate to home
             navigate("/", { replace: true });
           }
@@ -161,28 +159,9 @@ const Auth = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    const { signIn, signUp } = await import("@/contexts/AuthContext").then(m => {
-      // Use the hook values directly
-      return { signIn: async (email: string, password: string) => {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        return { error: error as Error | null };
-      }, signUp: async (email: string, password: string, fullName: string) => {
-        const redirectUrl = `${window.location.origin}/`;
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: redirectUrl,
-            data: { full_name: fullName },
-          },
-        });
-        return { error: error as Error | null };
-      }};
-    });
-
     try {
       if (mode === "login") {
-        const { error } = await signIn(email, password);
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
           if (error.message.includes("Invalid login credentials")) {
             toast.error("Invalid email or password");
@@ -214,7 +193,16 @@ const Auth = () => {
           return;
         }
         
-        const { error } = await signUp(email, password, name);
+        const redirectUrl = `${window.location.origin}/`;
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: redirectUrl,
+            data: { full_name: name },
+          },
+        });
+        
         if (error) {
           if (error.message.includes("already registered")) {
             toast.error("This email is already registered. Please sign in.");
@@ -222,7 +210,7 @@ const Auth = () => {
             toast.error(error.message);
           }
         } else {
-          toast.success("Account created successfully! Welcome to DAIZY.");
+          toast.success("Account created successfully! Welcome to DAISY.");
           navigate("/", { replace: true });
         }
       } else if (mode === "forgot") {
@@ -273,7 +261,7 @@ const Auth = () => {
   const getDescription = () => {
     switch (mode) {
       case "login": return "Sign in to your account to continue";
-      case "signup": return "Join DAIZY for exclusive access";
+      case "signup": return "Join DAISY for exclusive access";
       case "forgot": return "Enter your email to receive a reset link";
       case "reset": return "Enter your new password";
     }
@@ -309,7 +297,7 @@ const Auth = () => {
         >
           <Link to="/">
             <h1 className="text-4xl font-bold bg-gradient-romantic bg-clip-text text-transparent mb-2">
-              DAIZY
+              DAISY
             </h1>
           </Link>
           <p className="text-muted-foreground">Delicate Details, Distinctive You</p>
@@ -472,62 +460,68 @@ const Auth = () => {
                 </Button>
               </form>
 
-              <div className="text-center">
-                {mode === "login" && (
-                  <p className="text-sm text-muted-foreground">
-                    Don't have an account?{" "}
-                    <Button 
-                      variant="link" 
-                      className="px-0"
-                      onClick={() => setMode("signup")}
-                      disabled={isLoading}
-                    >
-                      Sign Up
-                    </Button>
-                  </p>
-                )}
-                {mode === "signup" && (
-                  <p className="text-sm text-muted-foreground">
-                    Already have an account?{" "}
-                    <Button 
-                      variant="link" 
-                      className="px-0"
-                      onClick={() => setMode("login")}
-                      disabled={isLoading}
-                    >
-                      Sign In
-                    </Button>
-                  </p>
-                )}
-                {(mode === "forgot" || mode === "reset") && (
-                  <p className="text-sm text-muted-foreground">
-                    <Button 
-                      variant="link" 
-                      className="px-0"
-                      onClick={() => setMode("login")}
-                      disabled={isLoading}
-                    >
-                      Back to Sign In
-                    </Button>
-                  </p>
-                )}
-              </div>
+              {/* Toggle between login and signup */}
+              {(mode === "login" || mode === "signup") && (
+                <div className="text-center text-sm">
+                  {mode === "login" ? (
+                    <p>
+                      Don't have an account?{" "}
+                      <Button 
+                        variant="link" 
+                        className="px-0 font-semibold"
+                        onClick={() => setMode("signup")}
+                        disabled={isLoading}
+                      >
+                        Sign Up
+                      </Button>
+                    </p>
+                  ) : (
+                    <p>
+                      Already have an account?{" "}
+                      <Button 
+                        variant="link" 
+                        className="px-0 font-semibold"
+                        onClick={() => setMode("login")}
+                        disabled={isLoading}
+                      >
+                        Sign In
+                      </Button>
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {mode === "forgot" && (
+                <div className="text-center">
+                  <Button 
+                    variant="link" 
+                    className="text-sm"
+                    onClick={() => setMode("login")}
+                    disabled={isLoading}
+                  >
+                    Back to Sign In
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
 
-        <motion.div 
-          className="mt-6 text-center"
+        <motion.p 
+          className="text-center text-sm text-muted-foreground mt-8"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
         >
-          <Link to="/">
-            <Button variant="ghost">
-              ← Back to Home
-            </Button>
+          By continuing, you agree to our{" "}
+          <Link to="/terms" className="underline hover:text-primary">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link to="/privacy" className="underline hover:text-primary">
+            Privacy Policy
           </Link>
-        </motion.div>
+        </motion.p>
       </div>
     </motion.div>
   );

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -9,9 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
-import { ShoppingCart, Heart, Loader2 } from "lucide-react";
+import { ShoppingCart, Heart, Loader2, AlertCircle } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { StarRating } from "@/components/StarRating";
+import { toast } from "sonner";
 
 interface Product {
   id: string;
@@ -37,6 +39,7 @@ const PRODUCTS_PER_PAGE = 8;
 
 const Shop = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const categoryFilter = searchParams.get("category");
   const searchQuery = searchParams.get("search");
   const wishlistFilter = searchParams.get("filter");
@@ -53,6 +56,7 @@ const Shop = () => {
   
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const { cart, addToCart, toggleWishlist, isInWishlist, wishlist } = useCart();
+  const { user } = useAuth();
 
   // Sync category filter from URL params
   useEffect(() => {
@@ -63,35 +67,37 @@ const Shop = () => {
     }
   }, [categoryFilter]);
 
-  // Fetch products from database
+  // Fetch products and categories in parallel for better performance
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchData = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          *,
-          category:categories(name)
-        `)
-        .eq('in_stock', true);
       
-      if (data && !error) {
-        setProducts(data as Product[]);
+      const [productsRes, categoriesRes] = await Promise.all([
+        supabase
+          .from('products')
+          .select(`
+            *,
+            category:categories(name)
+          `)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('categories')
+          .select('id, name')
+          .order('name')
+      ]);
+      
+      if (productsRes.data && !productsRes.error) {
+        setProducts(productsRes.data as Product[]);
       }
+      
+      if (categoriesRes.data && !categoriesRes.error) {
+        setCategories(categoriesRes.data);
+      }
+      
       setLoading(false);
     };
 
-    const fetchCategories = async () => {
-      const { data } = await supabase
-        .from('categories')
-        .select('id, name');
-      if (data) {
-        setCategories(data);
-      }
-    };
-
-    fetchProducts();
-    fetchCategories();
+    fetchData();
   }, []);
 
   const filteredProducts = useMemo(() => {
@@ -184,7 +190,22 @@ const Shop = () => {
     return () => observer.disconnect();
   }, [loadMore, hasMoreProducts, isLoadingMore]);
 
-  const handleAddToCart = (product: Product) => {
+  const handleAddToCart = async (product: Product) => {
+    // Check stock availability with strict control
+    if (!product.in_stock || product.stock_quantity <= 0) {
+      toast.error("Sorry, this product is out of stock");
+      return;
+    }
+
+    // Check if adding to cart would exceed available stock
+    const existingInCart = cart.find(item => item.id === product.id);
+    const currentQtyInCart = existingInCart?.quantity || 0;
+    
+    if (currentQtyInCart >= product.stock_quantity) {
+      toast.error(`Sorry, only ${product.stock_quantity} available in stock`);
+      return;
+    }
+
     addToCart({
       id: product.id,
       name: product.name,
@@ -356,74 +377,101 @@ const Shop = () => {
             initial="hidden"
             animate="visible"
           >
-            {displayedProducts.map((product) => (
-              <motion.div key={product.id} variants={itemVariants}>
-                <Card className="border-none shadow-soft hover:shadow-elegant transition-all group h-full">
-                  <Link to={`/product/${product.id}`}>
-                    <div className="relative overflow-hidden rounded-t-lg aspect-[3/4] bg-muted">
-                      {product.images && product.images[0] ? (
-                        <img 
-                          src={product.images[0]} 
-                          alt={product.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-muted">
-                          <span className="text-muted-foreground">No image</span>
-                        </div>
-                      )}
-                      {product.discount_percentage > 0 && (
-                        <Badge className="absolute top-4 left-4 bg-destructive text-destructive-foreground">
-                          {product.discount_percentage}% OFF
-                        </Badge>
-                      )}
-                      {product.is_new && (
-                        <Badge className="absolute top-4 right-4 bg-accent">New</Badge>
-                      )}
-                    </div>
-                  </Link>
-                  <CardContent className="p-4">
+            {displayedProducts.map((product) => {
+              const isOutOfStock = !product.in_stock || product.stock_quantity <= 0;
+              const existingInCart = cart.find(item => item.id === product.id);
+              const cartQty = existingInCart?.quantity || 0;
+              const canAddMore = product.stock_quantity > cartQty;
+              
+              return (
+                <motion.div key={product.id} variants={itemVariants}>
+                  <Card className={`border-none shadow-soft hover:shadow-elegant transition-all group h-full ${isOutOfStock ? 'opacity-75' : ''}`}>
                     <Link to={`/product/${product.id}`}>
-                      <Badge variant="secondary" className="mb-2">{product.category?.name || 'Uncategorized'}</Badge>
-                      <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">
-                        {product.name}
-                      </h3>
-                      <div className="flex items-center gap-2 mb-2">
-                        <StarRating rating={product.rating || 0} size="sm" />
-                        <span className="text-xs text-muted-foreground">({product.review_count || 0})</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-lg font-bold text-primary">PKR {product.price.toLocaleString()}</p>
-                        {product.discount_percentage > 0 && product.original_price > product.price && (
-                          <p className="text-sm text-muted-foreground line-through">
-                            PKR {product.original_price.toLocaleString()}
-                          </p>
+                      <div className="relative overflow-hidden rounded-t-lg aspect-[3/4] bg-muted">
+                        {product.images && product.images[0] ? (
+                          <img 
+                            src={product.images[0]} 
+                            alt={product.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-muted">
+                            <span className="text-muted-foreground">No image</span>
+                          </div>
+                        )}
+                        {product.discount_percentage > 0 && (
+                          <Badge className="absolute top-4 left-4 bg-destructive text-destructive-foreground">
+                            {product.discount_percentage}% OFF
+                          </Badge>
+                        )}
+                        {product.is_new && !isOutOfStock && (
+                          <Badge className="absolute top-4 right-4 bg-accent">New</Badge>
+                        )}
+                        {isOutOfStock && (
+                          <Badge className="absolute top-4 right-4 bg-destructive text-destructive-foreground">
+                            Out of Stock
+                          </Badge>
                         )}
                       </div>
                     </Link>
-                  </CardContent>
-                  <CardFooter className="p-4 pt-0 flex gap-2">
-                    <Button 
-                      className="flex-1" 
-                      variant="default"
-                      onClick={() => handleAddToCart(product)}
-                    >
-                      <ShoppingCart className="mr-2 h-4 w-4" />
-                      Add to Cart
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => toggleWishlist(product.id)}
-                      className={isInWishlist(product.id) ? "text-primary" : ""}
-                    >
-                      <Heart className={`h-4 w-4 ${isInWishlist(product.id) ? "fill-current" : ""}`} />
-                    </Button>
-                  </CardFooter>
-                </Card>
-              </motion.div>
-            ))}
+                    <CardContent className="p-4">
+                      <Link to={`/product/${product.id}`}>
+                        <Badge variant="secondary" className="mb-2">{product.category?.name || 'Uncategorized'}</Badge>
+                        <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">
+                          {product.name}
+                        </h3>
+                        <div className="flex items-center gap-2 mb-2">
+                          <StarRating rating={product.rating || 0} size="sm" />
+                          <span className="text-xs text-muted-foreground">({product.review_count || 0})</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-lg font-bold text-primary">PKR {product.price.toLocaleString()}</p>
+                          {product.discount_percentage > 0 && product.original_price > product.price && (
+                            <p className="text-sm text-muted-foreground line-through">
+                              PKR {product.original_price.toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                        {product.stock_quantity > 0 && product.stock_quantity <= 3 && (
+                          <p className="text-xs text-destructive mt-1">Only {product.stock_quantity} left!</p>
+                        )}
+                      </Link>
+                    </CardContent>
+                    <CardFooter className="p-4 pt-0 flex gap-2">
+                      <Button 
+                        className="flex-1" 
+                        variant={isOutOfStock || !canAddMore ? "outline" : "default"}
+                        onClick={() => handleAddToCart(product)}
+                        disabled={isOutOfStock || !canAddMore}
+                      >
+                        {isOutOfStock ? (
+                          <>
+                            <AlertCircle className="mr-2 h-4 w-4" />
+                            Out of Stock
+                          </>
+                        ) : !canAddMore ? (
+                          "Max in Cart"
+                        ) : (
+                          <>
+                            <ShoppingCart className="mr-2 h-4 w-4" />
+                            Add to Cart
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => toggleWishlist(product.id)}
+                        className={isInWishlist(product.id) ? "text-primary" : ""}
+                      >
+                        <Heart className={`h-4 w-4 ${isInWishlist(product.id) ? "fill-current" : ""}`} />
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                </motion.div>
+              );
+            })}
           </motion.div>
         )}
 

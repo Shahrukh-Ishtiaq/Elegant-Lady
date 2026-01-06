@@ -116,7 +116,7 @@ export const Footer = () => {
 
         <div className="border-t border-border mt-8 pt-8 text-center">
           <p className="text-sm text-muted-foreground">
-            © 2025 <span className="font-semibold text-primary">Elegant Lady</span>. All rights reserved.
+            © 2025 <span className="font-semibold text-primary">DAISY</span>. All rights reserved.
           </p>
         </div>
       </div>

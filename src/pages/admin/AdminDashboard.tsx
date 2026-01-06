@@ -35,6 +35,7 @@ const AdminDashboard = () => {
   const processedOrdersRef = useRef<Set<string>>(new Set());
   const reminderIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   // Wait for auth to complete before redirecting
   useEffect(() => {
@@ -48,6 +49,25 @@ const AdminDashboard = () => {
     }
   }, [user, isAdmin, loading, navigate]);
 
+  // Enable audio on first user interaction
+  useEffect(() => {
+    const handleInteraction = () => {
+      setHasInteracted(true);
+      // Resume audio context if it exists
+      if (audioContextRef.current?.state === 'suspended') {
+        audioContextRef.current.resume();
+      }
+    };
+
+    document.addEventListener('click', handleInteraction, { once: true });
+    document.addEventListener('keydown', handleInteraction, { once: true });
+
+    return () => {
+      document.removeEventListener('click', handleInteraction);
+      document.removeEventListener('keydown', handleInteraction);
+    };
+  }, []);
+
   useEffect(() => {
     if (isAdmin) {
       fetchStats();
@@ -56,9 +76,14 @@ const AdminDashboard = () => {
     }
   }, [isAdmin]);
 
-  // Reminder sound effect for unviewed orders
+  // Reminder sound effect for unviewed orders - every 30 seconds
   useEffect(() => {
-    if (unviewedOrders.size > 0 && soundEnabled) {
+    if (unviewedOrders.size > 0 && soundEnabled && hasInteracted) {
+      // Clear existing interval
+      if (reminderIntervalRef.current) {
+        clearInterval(reminderIntervalRef.current);
+      }
+      
       // Play reminder every 30 seconds until orders are viewed
       reminderIntervalRef.current = setInterval(() => {
         if (unviewedOrders.size > 0) {
@@ -76,7 +101,7 @@ const AdminDashboard = () => {
         }
       };
     }
-  }, [unviewedOrders.size, soundEnabled]);
+  }, [unviewedOrders.size, soundEnabled, hasInteracted]);
 
   const fetchStats = async () => {
     try {
@@ -108,7 +133,7 @@ const AdminDashboard = () => {
 
   const setupOrderNotifications = () => {
     const channel = supabase
-      .channel('admin-orders-loud')
+      .channel('admin-orders-realtime')
       .on(
         'postgres_changes',
         {
@@ -128,7 +153,7 @@ const AdminDashboard = () => {
             setUnviewedOrders(prev => new Set([...prev, newOrder.id]));
             
             // Play LOUD notification sound
-            if (soundEnabled) {
+            if (soundEnabled && hasInteracted) {
               playLoudNotificationSound();
             }
             
@@ -150,7 +175,9 @@ const AdminDashboard = () => {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Order subscription status:', status);
+      });
 
     return () => {
       supabase.removeChannel(channel);
@@ -195,8 +222,7 @@ const AdminDashboard = () => {
       const now = audioContext.currentTime;
       
       // Create a loud, attention-grabbing notification sound
-      // Multiple tones for urgency
-      const playTone = (frequency: number, startTime: number, duration: number, volume: number = 0.5) => {
+      const playTone = (frequency: number, startTime: number, duration: number, volume: number = 0.6) => {
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
         
@@ -215,19 +241,19 @@ const AdminDashboard = () => {
       
       // Play a loud multi-tone alert (like a cash register + alert)
       // First sequence - attention getter
-      playTone(880, now, 0.15, 0.6);
-      playTone(1046.5, now + 0.12, 0.15, 0.6);
-      playTone(1318.51, now + 0.24, 0.2, 0.7);
+      playTone(880, now, 0.15, 0.7);
+      playTone(1046.5, now + 0.12, 0.15, 0.7);
+      playTone(1318.51, now + 0.24, 0.2, 0.8);
       
       // Second sequence - confirmation chime
-      playTone(1318.51, now + 0.5, 0.1, 0.5);
-      playTone(1567.98, now + 0.6, 0.1, 0.5);
-      playTone(2093, now + 0.7, 0.3, 0.6);
+      playTone(1318.51, now + 0.5, 0.1, 0.6);
+      playTone(1567.98, now + 0.6, 0.1, 0.6);
+      playTone(2093, now + 0.7, 0.3, 0.7);
       
       // Third sequence - repeat for emphasis
-      playTone(880, now + 1.1, 0.15, 0.5);
-      playTone(1046.5, now + 1.22, 0.15, 0.5);
-      playTone(1318.51, now + 1.34, 0.25, 0.6);
+      playTone(880, now + 1.1, 0.15, 0.6);
+      playTone(1046.5, now + 1.22, 0.15, 0.6);
+      playTone(1318.51, now + 1.34, 0.25, 0.7);
       
     } catch (error) {
       console.log("Audio notification not available:", error);
@@ -245,7 +271,7 @@ const AdminDashboard = () => {
       const now = audioContext.currentTime;
       
       // Play a reminder beep - two short tones
-      const playTone = (frequency: number, startTime: number, duration: number, volume: number = 0.4) => {
+      const playTone = (frequency: number, startTime: number, duration: number, volume: number = 0.5) => {
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
         
@@ -262,15 +288,22 @@ const AdminDashboard = () => {
         oscillator.stop(startTime + duration);
       };
       
-      // Short reminder beeps
-      playTone(800, now, 0.1, 0.4);
-      playTone(1000, now + 0.15, 0.1, 0.4);
-      playTone(800, now + 0.4, 0.1, 0.4);
-      playTone(1000, now + 0.55, 0.1, 0.4);
+      // Short reminder beeps - louder and more urgent
+      playTone(800, now, 0.15, 0.5);
+      playTone(1000, now + 0.2, 0.15, 0.5);
+      playTone(800, now + 0.5, 0.15, 0.5);
+      playTone(1000, now + 0.7, 0.15, 0.5);
       
     } catch (error) {
       console.log("Reminder sound not available:", error);
     }
+  };
+
+  // Test sound button handler
+  const testSound = () => {
+    setHasInteracted(true);
+    playLoudNotificationSound();
+    toast.info("Sound test played!");
   };
 
   if (loading) {
@@ -314,6 +347,16 @@ const AdminDashboard = () => {
             <p className="text-muted-foreground mt-2">Manage your store</p>
           </div>
           <div className="flex items-center gap-3">
+            {/* Test Sound Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={testSound}
+              className="text-xs"
+            >
+              Test Sound
+            </Button>
+            
             {/* Sound Toggle */}
             <Button
               variant="outline"
