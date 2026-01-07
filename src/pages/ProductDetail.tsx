@@ -8,11 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
-import { ShoppingCart, Heart, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ShoppingCart, Heart, ArrowLeft, ChevronLeft, ChevronRight, Ruler } from "lucide-react";
 import { toast } from "sonner";
 import { useCart } from "@/contexts/CartContext";
 import { StarRating } from "@/components/StarRating";
 import { ProductReviews } from "@/components/ProductReviews";
+import { SizeGuidePopup } from "@/components/SizeGuidePopup";
 
 interface Product {
   id: string;
@@ -268,7 +269,18 @@ const ProductDetail = () => {
             {/* Size Selection */}
             {product.sizes && product.sizes.length > 0 && (
               <div className="space-y-3">
-                <label className="text-sm font-semibold">Select Size</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-semibold">Select Size</label>
+                  <SizeGuidePopup 
+                    category={product.category?.name}
+                    trigger={
+                      <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80 gap-1 h-auto py-1">
+                        <Ruler className="h-4 w-4" />
+                        Size Guide
+                      </Button>
+                    }
+                  />
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {product.sizes.map((size) => (
                     <Button

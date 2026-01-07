@@ -9,10 +9,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Admin email for notifications
+const ADMIN_EMAIL = "admin@daisy.com";
+
 // Simple in-memory rate limiting (resets on function cold start)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-const RATE_LIMIT = 5; // max 5 emails per email address
-const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour in ms
+const RATE_LIMIT = 5;
+const RATE_LIMIT_WINDOW = 60 * 60 * 1000;
 
 function isRateLimited(email: string): boolean {
   const now = Date.now();
@@ -60,6 +63,103 @@ interface OrderEmailRequest {
   total: number;
   shippingAddress: ShippingAddress;
   paymentMethod: string;
+  adminEmail?: string;
+}
+
+async function sendAdminNotification(
+  orderId: string,
+  customerName: string,
+  customerEmail: string,
+  items: OrderItem[],
+  total: number,
+  shippingAddress: ShippingAddress,
+  paymentMethod: string,
+  adminEmail: string
+) {
+  console.log("Sending admin notification to:", adminEmail);
+  
+  const itemsList = items.map(item => 
+    `• ${item.name} (Qty: ${item.quantity}) - PKR ${(item.price * item.quantity).toLocaleString()}`
+  ).join('<br>');
+
+  try {
+    const response = await resend.emails.send({
+      from: "DAISY Orders <onboarding@resend.dev>",
+      to: [adminEmail],
+      subject: `🛒 New Order #${orderId.slice(0, 8).toUpperCase()} - PKR ${total.toLocaleString()}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8;">
+          <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+            <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px 20px; text-align: center;">
+              <h1 style="color: #d4a5a5; margin: 0; font-size: 28px; font-weight: 600; letter-spacing: 1px;">🔔 NEW ORDER ALERT</h1>
+              <p style="color: #ffffff; margin: 8px 0 0; font-size: 14px;">Action required - New order received</p>
+            </div>
+            
+            <div style="padding: 30px;">
+              <div style="background: linear-gradient(135deg, #d4a5a5 0%, #e8c4c4 100%); padding: 20px; border-radius: 12px; margin-bottom: 24px; text-align: center;">
+                <p style="margin: 0; font-size: 14px; color: #333; font-weight: 600;">Order Number</p>
+                <p style="margin: 8px 0 0; font-size: 24px; font-weight: 700; color: #1a1a2e; letter-spacing: 2px;">#${orderId.slice(0, 8).toUpperCase()}</p>
+                <p style="margin: 12px 0 0; font-size: 28px; font-weight: 700; color: #1a1a2e;">PKR ${total.toLocaleString()}</p>
+              </div>
+              
+              <div style="margin-bottom: 24px;">
+                <h3 style="color: #333; margin: 0 0 12px; font-size: 16px; border-bottom: 2px solid #d4a5a5; padding-bottom: 8px;">👤 Customer Details</h3>
+                <p style="margin: 0; line-height: 1.8; color: #555;">
+                  <strong>Name:</strong> ${customerName}<br>
+                  <strong>Email:</strong> ${customerEmail}<br>
+                  <strong>Phone:</strong> ${shippingAddress.phone}
+                </p>
+              </div>
+              
+              <div style="margin-bottom: 24px;">
+                <h3 style="color: #333; margin: 0 0 12px; font-size: 16px; border-bottom: 2px solid #d4a5a5; padding-bottom: 8px;">📦 Order Items</h3>
+                <p style="margin: 0; line-height: 1.8; color: #555;">${itemsList}</p>
+              </div>
+              
+              <div style="margin-bottom: 24px;">
+                <h3 style="color: #333; margin: 0 0 12px; font-size: 16px; border-bottom: 2px solid #d4a5a5; padding-bottom: 8px;">📍 Shipping Address</h3>
+                <p style="margin: 0; line-height: 1.6; color: #555;">
+                  ${shippingAddress.firstName} ${shippingAddress.lastName}<br>
+                  ${shippingAddress.address}<br>
+                  ${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.zip}
+                </p>
+              </div>
+              
+              <div style="margin-bottom: 24px;">
+                <h3 style="color: #333; margin: 0 0 12px; font-size: 16px; border-bottom: 2px solid #d4a5a5; padding-bottom: 8px;">💳 Payment Method</h3>
+                <p style="margin: 0; color: #555; font-weight: 600;">
+                  ${paymentMethod === 'cod' ? '💵 Cash on Delivery' : '💳 Credit/Debit Card'}
+                </p>
+              </div>
+              
+              <div style="background-color: #fff3cd; padding: 16px; border-radius: 8px; border-left: 4px solid #ffc107;">
+                <p style="margin: 0; color: #856404; font-weight: 600;">⚡ Action Required</p>
+                <p style="margin: 8px 0 0; color: #856404; font-size: 14px;">Please process this order in your admin dashboard.</p>
+              </div>
+            </div>
+            
+            <div style="background-color: #1a1a2e; padding: 20px; text-align: center;">
+              <p style="color: #d4a5a5; margin: 0 0 4px; font-size: 16px; letter-spacing: 2px; font-weight: 600;">DAISY</p>
+              <p style="color: #888; margin: 0; font-size: 11px;">Admin Order Notification</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+    
+    console.log("Admin notification sent:", response);
+    return response;
+  } catch (error) {
+    console.error("Error sending admin notification:", error);
+    throw error;
+  }
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -77,7 +177,8 @@ const handler = async (req: Request): Promise<Response> => {
       items, 
       total, 
       shippingAddress, 
-      paymentMethod 
+      paymentMethod,
+      adminEmail
     }: OrderEmailRequest = await req.json();
 
     // Input validation
@@ -141,8 +242,9 @@ const handler = async (req: Request): Promise<Response> => {
       </tr>
     `).join('');
 
+    // Send customer confirmation email
     const emailResponse = await resend.emails.send({
-      from: "Elegant Lady <onboarding@resend.dev>",
+      from: "DAISY <onboarding@resend.dev>",
       to: [customerEmail],
       subject: `Order Confirmed - #${orderId.slice(0, 8).toUpperCase()}`,
       html: `
@@ -155,7 +257,7 @@ const handler = async (req: Request): Promise<Response> => {
         <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f9f5f3;">
           <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
             <div style="background: linear-gradient(135deg, #d4a5a5 0%, #c9a5a5 100%); padding: 40px 20px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 32px; font-weight: 300; letter-spacing: 2px;">Elegant Lady</h1>
+              <h1 style="color: #ffffff; margin: 0; font-size: 32px; font-weight: 300; letter-spacing: 2px;">DAISY</h1>
               <p style="color: #ffffff; margin: 8px 0 0; font-size: 14px; opacity: 0.9;">Seamless comfort anytime</p>
             </div>
             
@@ -205,14 +307,14 @@ const handler = async (req: Request): Promise<Response> => {
               
               <div style="background-color: #f9f5f3; padding: 20px; border-radius: 12px; text-align: center;">
                 <p style="margin: 0; color: #666; font-size: 14px;">
-                  Questions about your order? Contact us at support@elegantlady.com
+                  Questions about your order? Contact us on WhatsApp!
                 </p>
               </div>
             </div>
             
             <div style="background-color: #333; padding: 24px; text-align: center;">
-              <p style="color: #fff; margin: 0 0 8px; font-size: 18px; letter-spacing: 2px;">Elegant Lady</p>
-              <p style="color: #999; margin: 0; font-size: 12px;">© 2024 Elegant Lady. All rights reserved.</p>
+              <p style="color: #fff; margin: 0 0 8px; font-size: 18px; letter-spacing: 2px;">DAISY</p>
+              <p style="color: #999; margin: 0; font-size: 12px;">© 2024 DAISY. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -220,7 +322,25 @@ const handler = async (req: Request): Promise<Response> => {
       `,
     });
 
-    console.log("Email sent successfully:", emailResponse);
+    console.log("Customer email sent successfully:", emailResponse);
+
+    // Send admin notification email
+    const targetAdminEmail = adminEmail || ADMIN_EMAIL;
+    try {
+      await sendAdminNotification(
+        orderId,
+        customerName,
+        customerEmail,
+        items,
+        total,
+        shippingAddress,
+        paymentMethod,
+        targetAdminEmail
+      );
+    } catch (adminError) {
+      console.error("Admin notification failed but customer email sent:", adminError);
+      // Don't fail the whole request if admin email fails
+    }
 
     return new Response(JSON.stringify({ success: true, emailResponse }), {
       status: 200,
