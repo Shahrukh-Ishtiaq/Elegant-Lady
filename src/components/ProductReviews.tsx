@@ -87,11 +87,47 @@ export const ProductReviews = ({ productId, productRating, reviewCount }: Produc
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setReviews(data || []);
+      const reviewsData = data || [];
+      setReviews(reviewsData);
+      
+      // Sync product rating/review_count if there's a mismatch
+      if (reviewsData.length > 0) {
+        const avgRating = reviewsData.reduce((sum, r) => sum + r.rating, 0) / reviewsData.length;
+        const roundedRating = Math.round(avgRating * 10) / 10;
+        
+        if (roundedRating !== productRating || reviewsData.length !== reviewCount) {
+          await supabase
+            .from('products')
+            .update({ 
+              rating: roundedRating, 
+              review_count: reviewsData.length 
+            })
+            .eq('id', productId);
+        }
+      }
     } catch (error) {
       console.error('Error fetching reviews:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Update product rating and review count in the products table
+  const updateProductStats = async (reviewsList: Review[]) => {
+    if (reviewsList.length === 0) return;
+    
+    const avgRating = reviewsList.reduce((sum, r) => sum + r.rating, 0) / reviewsList.length;
+    
+    try {
+      await supabase
+        .from('products')
+        .update({ 
+          rating: Math.round(avgRating * 10) / 10, 
+          review_count: reviewsList.length 
+        })
+        .eq('id', productId);
+    } catch (error) {
+      console.error('Error updating product stats:', error);
     }
   };
 
@@ -132,10 +168,10 @@ export const ProductReviews = ({ productId, productRating, reviewCount }: Produc
 
       // Optimistically add the review to local state immediately
       if (data) {
-        setReviews(prev => {
-          if (prev.some(r => r.id === data.id)) return prev;
-          return [data, ...prev];
-        });
+        const updatedReviews = [data, ...reviews];
+        setReviews(updatedReviews);
+        // Update product stats immediately
+        await updateProductStats(updatedReviews);
       }
 
       toast.success("Review submitted successfully! Thank you for your feedback.");
