@@ -6,13 +6,25 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StarRating } from "@/components/StarRating";
 import { supabase } from "@/integrations/supabase/client";
-import { ThumbsUp, User, Loader2 } from "lucide-react";
+import { ThumbsUp, User, Loader2, Pencil, Trash2, X, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface Review {
   id: string;
   product_id: string;
+  user_id: string | null;
   user_name: string;
   rating: number;
   comment: string;
@@ -32,6 +44,8 @@ export const ProductReviews = ({ productId, productRating, reviewCount }: Produc
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [newReview, setNewReview] = useState({ name: "", rating: 5, comment: "" });
+  const [editingReview, setEditingReview] = useState<string | null>(null);
+  const [editData, setEditData] = useState({ rating: 5, comment: "" });
   const { user } = useAuth();
 
   useEffect(() => {
@@ -56,16 +70,27 @@ export const ProductReviews = ({ productId, productRating, reviewCount }: Produc
             setReviews(prev => {
               // Avoid duplicates
               if (prev.some(r => r.id === newReview.id)) return prev;
-              return [newReview, ...prev];
+              const updated = [newReview, ...prev];
+              // Update product stats
+              updateProductStats(updated);
+              return updated;
             });
           } else if (payload.eventType === 'UPDATE') {
             const updatedReview = payload.new as Review;
-            setReviews(prev => prev.map(r => 
-              r.id === updatedReview.id ? updatedReview : r
-            ));
+            setReviews(prev => {
+              const updated = prev.map(r => 
+                r.id === updatedReview.id ? updatedReview : r
+              );
+              updateProductStats(updated);
+              return updated;
+            });
           } else if (payload.eventType === 'DELETE') {
             const deletedReview = payload.old as Review;
-            setReviews(prev => prev.filter(r => r.id !== deletedReview.id));
+            setReviews(prev => {
+              const updated = prev.filter(r => r.id !== deletedReview.id);
+              updateProductStats(updated);
+              return updated;
+            });
           }
         }
       )
@@ -104,6 +129,12 @@ export const ProductReviews = ({ productId, productRating, reviewCount }: Produc
             })
             .eq('id', productId);
         }
+      } else if (reviewCount > 0) {
+        // Reset stats if no reviews
+        await supabase
+          .from('products')
+          .update({ rating: 0, review_count: 0 })
+          .eq('id', productId);
       }
     } catch (error) {
       console.error('Error fetching reviews:', error);
@@ -114,9 +145,9 @@ export const ProductReviews = ({ productId, productRating, reviewCount }: Produc
 
   // Update product rating and review count in the products table
   const updateProductStats = async (reviewsList: Review[]) => {
-    if (reviewsList.length === 0) return;
-    
-    const avgRating = reviewsList.reduce((sum, r) => sum + r.rating, 0) / reviewsList.length;
+    const avgRating = reviewsList.length > 0 
+      ? reviewsList.reduce((sum, r) => sum + r.rating, 0) / reviewsList.length 
+      : 0;
     
     try {
       await supabase
@@ -189,6 +220,70 @@ export const ProductReviews = ({ productId, productRating, reviewCount }: Produc
     }
   };
 
+  const handleEditReview = async (reviewId: string) => {
+    if (editData.comment.trim().length < 10) {
+      toast.error("Review must be at least 10 characters");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('reviews')
+        .update({ 
+          rating: editData.rating,
+          comment: editData.comment.trim() 
+        })
+        .eq('id', reviewId)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      setReviews(prev => {
+        const updated = prev.map(r => 
+          r.id === reviewId 
+            ? { ...r, rating: editData.rating, comment: editData.comment.trim() }
+            : r
+        );
+        updateProductStats(updated);
+        return updated;
+      });
+
+      setEditingReview(null);
+      toast.success("Review updated!");
+    } catch (error) {
+      console.error('Error updating review:', error);
+      toast.error("Failed to update review");
+    }
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    try {
+      const { error } = await supabase
+        .from('reviews')
+        .delete()
+        .eq('id', reviewId)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      setReviews(prev => {
+        const updated = prev.filter(r => r.id !== reviewId);
+        updateProductStats(updated);
+        return updated;
+      });
+
+      toast.success("Review deleted");
+    } catch (error) {
+      console.error('Error deleting review:', error);
+      toast.error("Failed to delete review");
+    }
+  };
+
+  const startEditReview = (review: Review) => {
+    setEditingReview(review.id);
+    setEditData({ rating: review.rating, comment: review.comment });
+  };
+
   const handleHelpful = async (reviewId: string, currentCount: number) => {
     try {
       const newCount = (currentCount || 0) + 1;
@@ -208,6 +303,10 @@ export const ProductReviews = ({ productId, productRating, reviewCount }: Produc
       console.error('Error updating helpful count:', error);
       toast.error("Could not update. Please try again.");
     }
+  };
+
+  const canEditReview = (review: Review) => {
+    return user && review.user_id === user.id;
   };
 
   const displayReviews = reviews;
@@ -365,39 +464,121 @@ export const ProductReviews = ({ productId, productRating, reviewCount }: Produc
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: index * 0.1 }}
+                layout
               >
                 <Card>
                   <CardContent className="pt-6">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <User className="h-5 w-5 text-primary" />
+                    {editingReview === review.id ? (
+                      // Edit Mode
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-sm font-medium">Rating</label>
+                          <div className="mt-1">
+                            <StarRating
+                              rating={editData.rating}
+                              size="lg"
+                              interactive
+                              onRatingChange={(rating) => setEditData({ ...editData, rating })}
+                            />
+                          </div>
                         </div>
                         <div>
-                          <p className="font-medium">{review.user_name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {new Date(review.created_at).toLocaleDateString("en-US", {
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                            })}
-                          </p>
+                          <label className="text-sm font-medium">Your Review</label>
+                          <Textarea
+                            value={editData.comment}
+                            onChange={(e) => setEditData({ ...editData, comment: e.target.value })}
+                            rows={3}
+                            maxLength={500}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={() => handleEditReview(review.id)}>
+                            <Check className="h-4 w-4 mr-1" />
+                            Save
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setEditingReview(null)}>
+                            <X className="h-4 w-4 mr-1" />
+                            Cancel
+                          </Button>
                         </div>
                       </div>
-                      <StarRating rating={review.rating} size="sm" />
-                    </div>
-                    
-                    <p className="text-muted-foreground mb-4">{review.comment}</p>
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleHelpful(review.id, review.helpful_count || 0)}
-                      className="text-muted-foreground hover:text-primary"
-                    >
-                      <ThumbsUp className="h-4 w-4 mr-1" />
-                      Helpful ({review.helpful_count || 0})
-                    </Button>
+                    ) : (
+                      // View Mode
+                      <>
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                              <User className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{review.user_name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {new Date(review.created_at).toLocaleDateString("en-US", {
+                                  year: "numeric",
+                                  month: "long",
+                                  day: "numeric",
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <StarRating rating={review.rating} size="sm" />
+                            {canEditReview(review) && (
+                              <div className="flex gap-1 ml-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => startEditReview(review)}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-destructive hover:text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Review?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This will permanently delete your review. This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction 
+                                        onClick={() => handleDeleteReview(review.id)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <p className="text-muted-foreground mb-4">{review.comment}</p>
+                        
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleHelpful(review.id, review.helpful_count || 0)}
+                          className="text-muted-foreground hover:text-primary"
+                        >
+                          <ThumbsUp className="h-4 w-4 mr-1" />
+                          Helpful ({review.helpful_count || 0})
+                        </Button>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               </motion.div>

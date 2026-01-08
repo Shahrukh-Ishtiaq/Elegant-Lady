@@ -30,7 +30,7 @@ const AdminDashboard = () => {
   });
   const [loadingStats, setLoadingStats] = useState(true);
   const [newOrderCount, setNewOrderCount] = useState(0);
-  const [unviewedOrders, setUnviewedOrders] = useState<Set<string>>(new Set());
+  const [pendingOrders, setPendingOrders] = useState<Set<string>>(new Set());
   const [soundEnabled, setSoundEnabled] = useState(true);
   const processedOrdersRef = useRef<Set<string>>(new Set());
   const reminderIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -76,20 +76,20 @@ const AdminDashboard = () => {
     }
   }, [isAdmin]);
 
-  // Reminder sound effect for unviewed orders - every 30 seconds
+  // Reminder sound effect for pending orders - every 30 seconds until approved
   useEffect(() => {
-    if (unviewedOrders.size > 0 && soundEnabled && hasInteracted) {
+    if (pendingOrders.size > 0 && soundEnabled && hasInteracted) {
       // Clear existing interval
       if (reminderIntervalRef.current) {
         clearInterval(reminderIntervalRef.current);
       }
       
-      // Play reminder every 30 seconds until orders are viewed
+      // Play reminder every 30 seconds until orders are approved/processed
       reminderIntervalRef.current = setInterval(() => {
-        if (unviewedOrders.size > 0) {
+        if (pendingOrders.size > 0) {
           playReminderSound();
-          toast.warning(`⚠️ ${unviewedOrders.size} order(s) pending review!`, {
-            description: "Click the Orders tab to view and approve.",
+          toast.warning(`⚠️ ${pendingOrders.size} order(s) waiting for approval!`, {
+            description: "Update order status to stop this alert.",
             duration: 8000,
           });
         }
@@ -100,23 +100,33 @@ const AdminDashboard = () => {
           clearInterval(reminderIntervalRef.current);
         }
       };
+    } else if (pendingOrders.size === 0 && reminderIntervalRef.current) {
+      // Stop sound when no more pending orders
+      clearInterval(reminderIntervalRef.current);
+      reminderIntervalRef.current = null;
     }
-  }, [unviewedOrders.size, soundEnabled, hasInteracted]);
+  }, [pendingOrders.size, soundEnabled, hasInteracted]);
 
   const fetchStats = async () => {
     try {
       const [productsRes, ordersRes, usersRes] = await Promise.all([
         supabase.from("products").select("id", { count: "exact" }),
-        supabase.from("orders").select("id, total", { count: "exact" }),
+        supabase.from("orders").select("id, total, status", { count: "exact" }),
         supabase.from("profiles").select("id", { count: "exact" }),
       ]);
 
       const totalRevenue = ordersRes.data?.reduce((sum, order) => sum + Number(order.total), 0) || 0;
 
       // Store existing order IDs so we don't alert for them
+      // Also track pending orders for sound alerts
+      const pendingOrderIds = new Set<string>();
       ordersRes.data?.forEach(order => {
         processedOrdersRef.current.add(order.id);
+        if (order.status === 'pending') {
+          pendingOrderIds.add(order.id);
+        }
       });
+      setPendingOrders(pendingOrderIds);
 
       setStats({
         totalProducts: productsRes.count || 0,
@@ -142,15 +152,17 @@ const AdminDashboard = () => {
           table: 'orders'
         },
         (payload) => {
-          const newOrder = payload.new as { id: string; total: number };
+          const newOrder = payload.new as { id: string; total: number; status: string };
           
           // Check if this is a new order we haven't processed
           if (!processedOrdersRef.current.has(newOrder.id)) {
             processedOrdersRef.current.add(newOrder.id);
             setNewOrderCount(prev => prev + 1);
             
-            // Add to unviewed orders
-            setUnviewedOrders(prev => new Set([...prev, newOrder.id]));
+            // Add to pending orders if status is pending
+            if (newOrder.status === 'pending') {
+              setPendingOrders(prev => new Set([...prev, newOrder.id]));
+            }
             
             // Play LOUD notification sound
             if (soundEnabled && hasInteracted) {
@@ -162,16 +174,35 @@ const AdminDashboard = () => {
               description: `Order #${newOrder.id.slice(0, 8)} - PKR ${Number(newOrder.total).toLocaleString()}`,
               duration: 15000,
               action: {
-                label: "View Order",
+                label: "View Orders",
                 onClick: () => {
-                  // Mark as viewed
-                  markOrderViewed(newOrder.id);
+                  // Navigate to orders tab
                 }
               }
             });
             
             // Refresh stats
             fetchStats();
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders'
+        },
+        (payload) => {
+          const updatedOrder = payload.new as { id: string; status: string };
+          
+          // Remove from pending orders when status changes from pending
+          if (updatedOrder.status !== 'pending') {
+            setPendingOrders(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(updatedOrder.id);
+              return newSet;
+            });
           }
         }
       )
@@ -187,20 +218,8 @@ const AdminDashboard = () => {
     };
   };
 
-  const markOrderViewed = useCallback((orderId: string) => {
-    setUnviewedOrders(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(orderId);
-      return newSet;
-    });
-  }, []);
-
-  const markAllOrdersViewed = useCallback(() => {
-    setUnviewedOrders(new Set());
+  const clearNewOrderBadge = useCallback(() => {
     setNewOrderCount(0);
-    if (reminderIntervalRef.current) {
-      clearInterval(reminderIntervalRef.current);
-    }
   }, []);
 
   const getAudioContext = () => {
@@ -373,15 +392,15 @@ const AdminDashboard = () => {
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-full cursor-pointer"
-                onClick={markAllOrdersViewed}
+                onClick={clearNewOrderBadge}
               >
                 <Bell className="h-5 w-5 animate-bounce" />
                 <span className="font-semibold">{newOrderCount} New Order{newOrderCount > 1 ? 's' : ''}!</span>
               </motion.div>
             )}
             
-            {/* Unviewed Orders Warning */}
-            {unviewedOrders.size > 0 && (
+            {/* Pending Orders Warning - Sound plays until status changes */}
+            {pendingOrders.size > 0 && (
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: [1, 1.05, 1] }}
@@ -389,7 +408,7 @@ const AdminDashboard = () => {
                 className="flex items-center gap-2 bg-destructive text-destructive-foreground px-4 py-2 rounded-full"
               >
                 <Bell className="h-5 w-5" />
-                <span className="font-semibold">{unviewedOrders.size} Pending Review</span>
+                <span className="font-semibold">{pendingOrders.size} Pending Approval</span>
               </motion.div>
             )}
           </div>
@@ -454,16 +473,16 @@ const AdminDashboard = () => {
         <motion.div variants={itemVariants}>
           <Tabs defaultValue="orders" className="space-y-6" onValueChange={(value) => {
             if (value === 'orders') {
-              markAllOrdersViewed();
+              clearNewOrderBadge();
             }
           }}>
             <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 max-w-5xl">
               <TabsTrigger value="orders" className="flex items-center gap-1 relative">
                 <ShoppingCart className="h-3 w-3" />
                 <span className="hidden sm:inline">Orders</span>
-                {unviewedOrders.size > 0 && (
+                {pendingOrders.size > 0 && (
                   <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    {unviewedOrders.size}
+                    {pendingOrders.size}
                   </span>
                 )}
               </TabsTrigger>

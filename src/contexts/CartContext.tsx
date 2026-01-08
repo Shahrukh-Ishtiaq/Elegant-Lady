@@ -111,6 +111,45 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addToCart = async (item: CartItem) => {
+    // First check real-time stock availability
+    try {
+      const { data: product, error: stockError } = await supabase
+        .from('products')
+        .select('stock_quantity, in_stock')
+        .eq('id', item.id)
+        .single();
+      
+      if (stockError) throw stockError;
+      
+      const currentStock = product?.stock_quantity || 0;
+      const isInStock = product?.in_stock !== false;
+      
+      // Check if product is out of stock
+      if (!isInStock || currentStock <= 0) {
+        toast.error("Sorry, this product is out of stock!");
+        return;
+      }
+      
+      // Calculate total quantity including existing cart items
+      const existingInCart = cart.find(
+        (i) => i.id === item.id && i.selectedSize === item.selectedSize && i.selectedColor === item.selectedColor
+      );
+      const totalRequested = (existingInCart?.quantity || 0) + item.quantity;
+      
+      // Check if requested quantity exceeds available stock
+      if (totalRequested > currentStock) {
+        if (currentStock === 1) {
+          toast.error("Only 1 item left in stock and it's already in someone's cart!");
+        } else {
+          toast.error(`Only ${currentStock} items available. You already have ${existingInCart?.quantity || 0} in cart.`);
+        }
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking stock:', error);
+      // Continue with add to cart if stock check fails
+    }
+
     if (user) {
       // Save to database for logged-in users
       try {

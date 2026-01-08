@@ -26,6 +26,7 @@ interface Product {
   sizes: string[] | null;
   colors: string[] | null;
   in_stock: boolean | null;
+  stock_quantity: number | null;
   rating: number | null;
   review_count: number | null;
   is_new: boolean | null;
@@ -78,7 +79,10 @@ const ProductDetail = () => {
     setSelectedColor("");
   }, [id]);
 
-  const handleAddToCart = () => {
+  // Check if product is truly available (in_stock and has stock quantity)
+  const isProductAvailable = product?.in_stock !== false && (product?.stock_quantity || 0) > 0;
+
+  const handleAddToCart = async () => {
     if (!product) return;
     
     if (product.sizes && product.sizes.length > 0 && !selectedSize) {
@@ -87,6 +91,20 @@ const ProductDetail = () => {
     }
     if (product.colors && product.colors.length > 0 && !selectedColor) {
       toast.error("Please select a color");
+      return;
+    }
+
+    // Re-check stock before adding to cart
+    const { data: currentProduct } = await supabase
+      .from('products')
+      .select('stock_quantity, in_stock')
+      .eq('id', product.id)
+      .single();
+    
+    if (!currentProduct?.in_stock || (currentProduct?.stock_quantity || 0) <= 0) {
+      toast.error("Sorry, this product is now out of stock!");
+      // Update local state
+      setProduct(prev => prev ? { ...prev, in_stock: false, stock_quantity: 0 } : null);
       return;
     }
     
@@ -320,10 +338,10 @@ const ProductDetail = () => {
                 className="flex-1" 
                 size="lg"
                 onClick={handleAddToCart}
-                disabled={!product.in_stock}
+                disabled={!isProductAvailable}
               >
                 <ShoppingCart className="mr-2 h-5 w-5" />
-                {product.in_stock ? "Add to Cart" : "Out of Stock"}
+                {isProductAvailable ? "Add to Cart" : "Out of Stock"}
               </Button>
               <Button 
                 variant="outline" 
