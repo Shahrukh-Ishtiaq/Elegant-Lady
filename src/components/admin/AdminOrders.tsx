@@ -593,22 +593,24 @@ export const AdminOrders = () => {
       {/* Order Details Modal */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="flex flex-row items-center justify-between">
-            <DialogTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Order #{selectedOrder?.id.slice(0, 8).toUpperCase()}
-            </DialogTitle>
-            {selectedOrder && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePrintOrder(selectedOrder)}
-                className="print:hidden"
-              >
-                <Printer className="h-4 w-4 mr-2" />
-                Print A4
-              </Button>
-            )}
+          <DialogHeader>
+            <div className="flex items-center justify-between w-full">
+              <DialogTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Order #{selectedOrder?.id.slice(0, 8).toUpperCase()}
+              </DialogTitle>
+              {selectedOrder && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePrintOrder(selectedOrder)}
+                  className="print:hidden ml-4"
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print A4
+                </Button>
+              )}
+            </div>
           </DialogHeader>
           
           {selectedOrder && (
