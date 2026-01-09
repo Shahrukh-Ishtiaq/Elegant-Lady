@@ -7,9 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Loader2, Bell, Package, Eye, MapPin, Phone, Mail, CreditCard, Calendar, Filter, CalendarDays } from "lucide-react";
+import { Loader2, Bell, Package, Eye, MapPin, Phone, Mail, CreditCard, Calendar, Filter, CalendarDays, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { format, isToday, isYesterday, parseISO, startOfDay, endOfDay } from "date-fns";
+import { useRef } from "react";
 
 interface OrderItem {
   name: string;
@@ -17,6 +18,7 @@ interface OrderItem {
   price: number;
   selectedSize?: string;
   selectedColor?: string;
+  image?: string;
 }
 
 interface Order {
@@ -196,6 +198,144 @@ export const AdminOrders = () => {
   const viewOrderDetails = (order: Order) => {
     setSelectedOrder(order);
     setDetailsOpen(true);
+  };
+
+  const handlePrintOrder = (order: Order) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error("Please allow popups for printing");
+      return;
+    }
+
+    const orderDate = format(new Date(order.created_at), "MMMM dd, yyyy 'at' HH:mm");
+    
+    const printContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Order #${order.id.slice(0, 8).toUpperCase()}</title>
+  <style>
+    @page { size: A4; margin: 20mm; }
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { padding: 20px; color: #333; line-height: 1.5; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #d4a574; padding-bottom: 20px; margin-bottom: 20px; }
+    .logo { font-size: 28px; font-weight: bold; color: #d4a574; }
+    .order-info { text-align: right; }
+    .order-id { font-size: 18px; font-weight: bold; color: #333; }
+    .order-date { color: #666; font-size: 14px; }
+    .status { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; text-transform: uppercase; background: #fef3cd; color: #856404; }
+    .status.delivered { background: #d4edda; color: #155724; }
+    .status.shipped { background: #cce5ff; color: #004085; }
+    .status.processing { background: #e2d5f1; color: #5a3d8a; }
+    .status.cancelled { background: #f8d7da; color: #721c24; }
+    .section { margin-bottom: 25px; }
+    .section-title { font-size: 14px; font-weight: bold; text-transform: uppercase; color: #666; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 12px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .info-block { background: #f9f9f9; padding: 15px; border-radius: 8px; }
+    .info-label { font-size: 12px; color: #888; margin-bottom: 4px; }
+    .info-value { font-size: 14px; color: #333; font-weight: 500; }
+    .items-table { width: 100%; border-collapse: collapse; }
+    .items-table th { text-align: left; padding: 12px; background: #f5f0eb; color: #666; font-size: 12px; text-transform: uppercase; }
+    .items-table td { padding: 12px; border-bottom: 1px solid #eee; vertical-align: middle; }
+    .product-cell { display: flex; align-items: center; gap: 12px; }
+    .product-image { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #eee; }
+    .product-name { font-weight: 500; }
+    .product-details { font-size: 12px; color: #666; margin-top: 4px; }
+    .text-right { text-align: right; }
+    .total-row { font-weight: bold; font-size: 16px; }
+    .footer { margin-top: 30px; padding-top: 20px; border-top: 2px solid #d4a574; text-align: center; color: #888; font-size: 12px; }
+    @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="logo">DAISY</div>
+      <div style="color: #888; font-size: 12px;">Delicate Details, Distinctive You</div>
+    </div>
+    <div class="order-info">
+      <div class="order-id">Order #${order.id.slice(0, 8).toUpperCase()}</div>
+      <div class="order-date">${orderDate}</div>
+      <div class="status ${order.status}">${order.status}</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Customer & Shipping Information</div>
+    <div class="grid">
+      <div class="info-block">
+        <div class="info-label">Customer Name</div>
+        <div class="info-value">${order.shipping_address?.firstName || ''} ${order.shipping_address?.lastName || ''}</div>
+        <div class="info-label" style="margin-top: 12px;">Email</div>
+        <div class="info-value">${order.shipping_address?.email || 'N/A'}</div>
+        <div class="info-label" style="margin-top: 12px;">Phone</div>
+        <div class="info-value">${order.shipping_address?.phone || 'N/A'}</div>
+      </div>
+      <div class="info-block">
+        <div class="info-label">Shipping Address</div>
+        <div class="info-value">
+          ${order.shipping_address?.address || ''}<br/>
+          ${order.shipping_address?.city || ''}${order.shipping_address?.state ? ', ' + order.shipping_address.state : ''}${order.shipping_address?.zip ? ' ' + order.shipping_address.zip : ''}
+        </div>
+        <div class="info-label" style="margin-top: 12px;">Payment Method</div>
+        <div class="info-value">${order.payment_method === 'cod' ? 'Cash on Delivery' : 'Card Payment'}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Order Items</div>
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th style="width: 50%;">Product</th>
+          <th>Quantity</th>
+          <th class="text-right">Price</th>
+          <th class="text-right">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${order.items?.map(item => `
+          <tr>
+            <td>
+              <div class="product-cell">
+                ${item.image ? `<img src="${item.image}" class="product-image" alt="${item.name}" onerror="this.style.display='none'" />` : ''}
+                <div>
+                  <div class="product-name">${item.name}</div>
+                  <div class="product-details">
+                    ${item.selectedSize ? `Size: ${item.selectedSize}` : ''}
+                    ${item.selectedSize && item.selectedColor ? ' • ' : ''}
+                    ${item.selectedColor ? `Color: ${item.selectedColor}` : ''}
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td>${item.quantity}</td>
+            <td class="text-right">PKR ${item.price.toLocaleString()}</td>
+            <td class="text-right">PKR ${(item.price * item.quantity).toLocaleString()}</td>
+          </tr>
+        `).join('') || ''}
+        <tr class="total-row">
+          <td colspan="3" class="text-right" style="border-top: 2px solid #d4a574; padding-top: 16px;">Order Total:</td>
+          <td class="text-right" style="border-top: 2px solid #d4a574; padding-top: 16px; color: #d4a574;">PKR ${Number(order.total).toLocaleString()}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    <p>Thank you for shopping with DAISY!</p>
+    <p>For any queries, please contact our customer support.</p>
+  </div>
+
+  <script>
+    window.onload = function() { window.print(); }
+  </script>
+</body>
+</html>`;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
   };
 
   const getStatusColor = (status: string) => {
@@ -453,11 +593,22 @@ export const AdminOrders = () => {
       {/* Order Details Modal */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+          <DialogHeader className="flex flex-row items-center justify-between">
             <DialogTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
               Order #{selectedOrder?.id.slice(0, 8).toUpperCase()}
             </DialogTitle>
+            {selectedOrder && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePrintOrder(selectedOrder)}
+                className="print:hidden"
+              >
+                <Printer className="h-4 w-4 mr-2" />
+                Print A4
+              </Button>
+            )}
           </DialogHeader>
           
           {selectedOrder && (
