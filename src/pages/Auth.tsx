@@ -9,10 +9,10 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Home, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 import { PasswordInput } from "@/components/PasswordInput";
 
-type AuthMode = "login" | "signup" | "forgot" | "reset";
+type AuthMode = "login" | "signup" | "forgot";
 
 // Common disposable email domains to block
 const DISPOSABLE_DOMAINS = [
@@ -24,7 +24,6 @@ const Auth = () => {
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -48,14 +47,15 @@ const Auth = () => {
         return;
       }
 
-      // Check for password reset token
+      // Check for password reset token - redirect to dedicated reset page
       if (type === "recovery") {
-        setMode("reset");
+        // Redirect to the dedicated reset password page with the hash params
+        navigate(`/reset-password${window.location.hash}`, { replace: true });
         return;
       }
 
       // If there's an access token in the URL, we're returning from OAuth
-      if (accessToken) {
+      if (accessToken && type !== "recovery") {
         setIsProcessingOAuth(true);
         try {
           // Let Supabase handle the session from the URL
@@ -89,10 +89,10 @@ const Auth = () => {
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (!authLoading && !isProcessingOAuth && user && mode !== "reset") {
+    if (!authLoading && !isProcessingOAuth && user) {
       navigate("/", { replace: true });
     }
-  }, [user, authLoading, navigate, mode, isProcessingOAuth]);
+  }, [user, authLoading, navigate, isProcessingOAuth]);
 
   const validateEmail = (email: string): { valid: boolean; message?: string } => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -229,32 +229,15 @@ const Auth = () => {
           return;
         }
 
+        // Redirect to dedicated reset password page
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/auth#type=recovery`,
+          redirectTo: `${window.location.origin}/reset-password#type=recovery`,
         });
         if (error) {
           toast.error(error.message);
         } else {
           toast.success("Password reset link sent to your email! Please check your inbox.");
           setMode("login");
-        }
-      } else if (mode === "reset") {
-        if (password !== confirmPassword) {
-          toast.error("Passwords do not match");
-          setIsLoading(false);
-          return;
-        }
-        if (password.length < 6) {
-          toast.error("Password must be at least 6 characters");
-          setIsLoading(false);
-          return;
-        }
-        const { error } = await supabase.auth.updateUser({ password });
-        if (error) {
-          toast.error(error.message);
-        } else {
-          toast.success("Password updated successfully!");
-          navigate("/", { replace: true });
         }
       }
     } catch (error) {
@@ -269,7 +252,6 @@ const Auth = () => {
       case "login": return "Welcome Back";
       case "signup": return "Create Account";
       case "forgot": return "Reset Password";
-      case "reset": return "Set New Password";
     }
   };
 
@@ -278,7 +260,6 @@ const Auth = () => {
       case "login": return "Sign in to your account to continue";
       case "signup": return "Join DAISY for exclusive access";
       case "forgot": return "Enter your email to receive a reset link";
-      case "reset": return "Enter your new password";
     }
   };
 
@@ -413,7 +394,7 @@ const Auth = () => {
                   </div>
                 )}
                 
-                {mode !== "reset" && (
+                {mode !== "forgot" && (
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
                     <Input 
@@ -433,31 +414,29 @@ const Auth = () => {
                   </div>
                 )}
 
-                {(mode === "login" || mode === "signup" || mode === "reset") && (
+                {mode === "forgot" && (
                   <div className="space-y-2">
-                    <Label htmlFor="password">
-                      {mode === "reset" ? "New Password" : "Password"}
-                    </Label>
-                    <PasswordInput 
-                      id="password" 
-                      placeholder={mode === "reset" ? "Enter new password" : "Enter your password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                    <Label htmlFor="email">Email</Label>
+                    <Input 
+                      id="email" 
+                      type="email" 
+                      placeholder="Enter your email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       required
-                      minLength={6}
                       disabled={isLoading}
                     />
                   </div>
                 )}
 
-                {mode === "reset" && (
+                {(mode === "login" || mode === "signup") && (
                   <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                    <Label htmlFor="password">Password</Label>
                     <PasswordInput 
-                      id="confirmPassword" 
-                      placeholder="Confirm your password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      id="password" 
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
                       required
                       minLength={6}
                       disabled={isLoading}
@@ -484,13 +463,11 @@ const Auth = () => {
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       {mode === "login" ? "Signing In..." : 
-                       mode === "signup" ? "Creating Account..." :
-                       mode === "forgot" ? "Sending..." : "Updating..."}
+                       mode === "signup" ? "Creating Account..." : "Sending..."}
                     </>
                   ) : (
                     mode === "login" ? "Sign In" : 
-                    mode === "signup" ? "Create Account" :
-                    mode === "forgot" ? "Send Reset Link" : "Update Password"
+                    mode === "signup" ? "Create Account" : "Send Reset Link"
                   )}
                 </Button>
               </form>
