@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, Home, ArrowLeft } from "lucide-react";
 import { PasswordInput } from "@/components/PasswordInput";
 
 type AuthMode = "login" | "signup" | "forgot" | "reset";
@@ -221,13 +221,21 @@ const Auth = () => {
           navigate("/", { replace: true });
         }
       } else if (mode === "forgot") {
+        // Validate email
+        const emailValidation = validateEmail(email);
+        if (!emailValidation.valid) {
+          toast.error(emailValidation.message);
+          setIsLoading(false);
+          return;
+        }
+
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/auth#type=recovery`,
         });
         if (error) {
           toast.error(error.message);
         } else {
-          toast.success("Password reset link sent to your email!");
+          toast.success("Password reset link sent to your email! Please check your inbox.");
           setMode("login");
         }
       } else if (mode === "reset") {
@@ -296,6 +304,26 @@ const Auth = () => {
       transition={{ duration: 0.5 }}
     >
       <div className="w-full max-w-md">
+        {/* Back to Home Button */}
+        <motion.div
+          className="mb-4"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <Button
+            variant="ghost"
+            size="sm"
+            asChild
+            className="gap-2 text-muted-foreground hover:text-foreground"
+          >
+            <Link to="/">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Home
+            </Link>
+          </Button>
+        </motion.div>
+
         <motion.div 
           className="text-center mb-8"
           initial={{ opacity: 0, y: -20 }}
