@@ -229,14 +229,24 @@ const Auth = () => {
           return;
         }
 
-        // Redirect to dedicated reset password page
+        // Send password reset email via Supabase Auth
+        // The redirectTo URL should NOT include hash params - Supabase adds them automatically
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/reset-password#type=recovery`,
+          redirectTo: `${window.location.origin}/reset-password`,
         });
+        
         if (error) {
-          toast.error(error.message);
+          if (error.message.includes("rate limit") || error.message.includes("too many")) {
+            toast.error("Too many reset attempts. Please wait a few minutes and try again.");
+          } else {
+            toast.error(error.message);
+          }
         } else {
-          toast.success("Password reset link sent to your email! Please check your inbox.");
+          toast.success(
+            "Password reset link sent! Check your email inbox (and spam folder).",
+            { duration: 6000 }
+          );
+          setEmail("");
           setMode("login");
         }
       }
