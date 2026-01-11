@@ -7,14 +7,15 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft, CheckCircle, XCircle, Lock, Shield, Eye, EyeOff } from "lucide-react";
+import { Loader2, ArrowLeft, CheckCircle, XCircle, Lock, Shield } from "lucide-react";
 import { PasswordInput } from "@/components/PasswordInput";
 
 const ResetPassword = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isValidToken, setIsValidToken] = useState<boolean | null>(null);
+  const [isValidating, setIsValidating] = useState(true);
+  const [isValidToken, setIsValidToken] = useState<boolean>(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [tokenExpired, setTokenExpired] = useState(false);
@@ -31,80 +32,110 @@ const ResetPassword = () => {
   const passwordStrength = [hasMinLength, hasUpperCase, hasLowerCase, hasNumber, hasSpecialChar].filter(Boolean).length;
 
   useEffect(() => {
+    let mounted = true;
+
     const validateResetToken = async () => {
       try {
-        // Check URL hash for recovery token
+        console.log("Validating reset token...");
+        console.log("Current URL:", window.location.href);
+        console.log("Hash:", window.location.hash);
+
+        // Parse hash parameters
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get("access_token");
+        const refreshToken = hashParams.get("refresh_token");
         const type = hashParams.get("type");
+        const errorCode = hashParams.get("error_code");
         const errorDescription = hashParams.get("error_description");
 
-        // Handle expired or invalid token error from Supabase
-        if (errorDescription) {
-          console.error("Token error:", errorDescription);
-          if (errorDescription.includes("expired") || errorDescription.includes("invalid")) {
-            setTokenExpired(true);
-          }
-          setIsValidToken(false);
-          return;
-        }
+        console.log("Token type:", type);
+        console.log("Access token exists:", !!accessToken);
+        console.log("Refresh token exists:", !!refreshToken);
+        console.log("Error code:", errorCode);
+        console.log("Error description:", errorDescription);
 
-        // Check if this is a recovery flow
-        if (type === "recovery" && accessToken) {
-          // Get the current session to verify the token is valid
-          const { data: { session }, error } = await supabase.auth.getSession();
-          
-          if (error) {
-            console.error("Session error:", error);
-            if (error.message.includes("expired") || error.message.includes("invalid")) {
+        // Handle expired or invalid token error from URL
+        if (errorCode || errorDescription) {
+          console.error("Token error from URL:", errorCode, errorDescription);
+          if (mounted) {
+            if (errorDescription?.includes("expired") || errorCode === "otp_expired") {
               setTokenExpired(true);
             }
             setIsValidToken(false);
+            setIsValidating(false);
+          }
+          return;
+        }
+
+        // Check if this is a recovery flow with tokens
+        if (type === "recovery" && accessToken && refreshToken) {
+          console.log("Attempting to set session with recovery tokens...");
+          
+          // Set the session using the tokens from URL
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (error) {
+            console.error("Failed to set session:", error);
+            if (mounted) {
+              if (error.message.includes("expired") || error.message.includes("invalid") || error.message.includes("Refresh")) {
+                setTokenExpired(true);
+              }
+              setIsValidToken(false);
+              setIsValidating(false);
+            }
             return;
           }
 
-          if (session?.user) {
+          if (data.session?.user) {
+            console.log("Session established successfully for:", data.session.user.email);
+            if (mounted) {
+              setUserEmail(data.session.user.email || null);
+              setIsValidToken(true);
+              setIsValidating(false);
+            }
+            // Clear the hash from URL for cleaner appearance
+            window.history.replaceState(null, '', window.location.pathname);
+            return;
+          }
+        }
+
+        // If no valid recovery params, check for existing session
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          // Check if we're in a password recovery context
+          console.log("Existing session found for:", session.user.email);
+          if (mounted) {
             setUserEmail(session.user.email || null);
             setIsValidToken(true);
-          } else {
-            // Try to set session from URL tokens
-            const refreshToken = hashParams.get("refresh_token");
-            if (accessToken && refreshToken) {
-              const { data, error: sessionError } = await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken,
-              });
-
-              if (sessionError) {
-                console.error("Set session error:", sessionError);
-                if (sessionError.message.includes("expired") || sessionError.message.includes("invalid")) {
-                  setTokenExpired(true);
-                }
-                setIsValidToken(false);
-                return;
-              }
-
-              if (data.user) {
-                setUserEmail(data.user.email || null);
-                setIsValidToken(true);
-              } else {
-                setIsValidToken(false);
-              }
-            } else {
-              setIsValidToken(false);
-            }
+            setIsValidating(false);
           }
-        } else {
-          // No recovery token found
+          return;
+        }
+
+        // No valid token or session found
+        console.log("No valid recovery token or session found");
+        if (mounted) {
           setIsValidToken(false);
+          setIsValidating(false);
         }
       } catch (error) {
         console.error("Token validation error:", error);
-        setIsValidToken(false);
+        if (mounted) {
+          setIsValidToken(false);
+          setIsValidating(false);
+        }
       }
     };
 
     validateResetToken();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -129,15 +160,16 @@ const ResetPassword = () => {
     setIsLoading(true);
 
     try {
+      console.log("Updating password...");
       const { error } = await supabase.auth.updateUser({ password });
 
       if (error) {
         console.error("Password update error:", error);
-        if (error.message.includes("expired") || error.message.includes("invalid")) {
+        if (error.message.includes("expired") || error.message.includes("invalid") || error.message.includes("session")) {
           setTokenExpired(true);
           setIsValidToken(false);
-          toast.error("This reset link has expired. Please request a new one.");
-        } else if (error.message.includes("same as")) {
+          toast.error("Your session has expired. Please request a new password reset link.");
+        } else if (error.message.includes("same as") || error.message.includes("different")) {
           toast.error("New password must be different from your current password");
         } else {
           toast.error(error.message || "Failed to update password");
@@ -145,15 +177,15 @@ const ResetPassword = () => {
         return;
       }
 
-      // Success!
+      console.log("Password updated successfully!");
       setIsSuccess(true);
       toast.success("Password updated successfully!");
       
-      // Sign out and redirect to login after a short delay
-      setTimeout(async () => {
-        await supabase.auth.signOut();
-        navigate("/auth", { replace: true });
-      }, 3000);
+      // Auto-login is already done since user has active session
+      // Redirect to home after a short delay
+      setTimeout(() => {
+        navigate("/", { replace: true });
+      }, 2500);
 
     } catch (error: any) {
       console.error("Unexpected error:", error);
@@ -177,15 +209,31 @@ const ResetPassword = () => {
   };
 
   // Loading state while validating token
-  if (isValidToken === null) {
+  if (isValidating) {
     return (
       <div className="min-h-screen bg-gradient-soft flex items-center justify-center p-4">
-        <Card className="border-none shadow-elegant p-8">
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-muted-foreground">Validating reset link...</p>
-          </div>
-        </Card>
+        <div className="w-full max-w-md">
+          <motion.div 
+            className="text-center mb-8"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Link to="/">
+              <h1 className="text-4xl font-bold bg-gradient-romantic bg-clip-text text-transparent mb-2">
+                DAISY
+              </h1>
+            </Link>
+            <p className="text-muted-foreground">Delicate Details, Distinctive You</p>
+          </motion.div>
+          
+          <Card className="border-none shadow-elegant p-8">
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-muted-foreground">Validating your reset link...</p>
+            </div>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -237,7 +285,7 @@ const ResetPassword = () => {
               
               <div className="flex flex-col gap-3">
                 <Button asChild className="w-full" size="lg">
-                  <Link to="/auth">Request New Reset Link</Link>
+                  <Link to="/auth?mode=forgot">Request New Reset Link</Link>
                 </Button>
                 <Button variant="ghost" asChild className="w-full">
                   <Link to="/">
@@ -289,19 +337,19 @@ const ResetPassword = () => {
               </motion.div>
               <CardTitle className="text-2xl">Password Updated!</CardTitle>
               <CardDescription>
-                Your password has been successfully changed.
+                Your DAISY account password has been successfully changed.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 text-center">
               <p className="text-sm text-muted-foreground">
-                You will be redirected to the login page in a moment...
+                You are now logged in. Redirecting to home...
               </p>
               <div className="flex items-center justify-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
                 <span className="text-sm text-muted-foreground">Redirecting...</span>
               </div>
               <Button variant="outline" asChild className="w-full mt-4">
-                <Link to="/auth">Go to Login Now</Link>
+                <Link to="/">Go to Home Now</Link>
               </Button>
             </CardContent>
           </Card>
@@ -365,7 +413,7 @@ const ResetPassword = () => {
               </div>
               <CardTitle className="text-2xl">Set New Password</CardTitle>
               <CardDescription>
-                Create a strong password for your account
+                Create a strong password for your DAISY account
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -380,10 +428,10 @@ const ResetPassword = () => {
                   type="email"
                   value={userEmail || ""}
                   disabled
-                  className="bg-muted/50 cursor-not-allowed"
+                  className="bg-muted/50 cursor-not-allowed font-medium"
                 />
                 <p className="text-xs text-muted-foreground">
-                  This is the email associated with your account
+                  This is the email associated with your DAISY account
                 </p>
               </div>
 
@@ -466,26 +514,23 @@ const ResetPassword = () => {
                     disabled={isLoading}
                   />
                   {confirmPassword.length > 0 && (
-                    <p className={`text-xs flex items-center gap-1.5 ${passwordsMatch ? "text-green-600" : "text-destructive"}`}>
+                    <div className={`flex items-center gap-1.5 text-xs ${
+                      passwordsMatch ? "text-green-600" : "text-destructive"
+                    }`}>
                       {passwordsMatch ? (
-                        <>
-                          <CheckCircle className="h-3.5 w-3.5" />
-                          Passwords match
-                        </>
+                        <CheckCircle className="h-3.5 w-3.5" />
                       ) : (
-                        <>
-                          <XCircle className="h-3.5 w-3.5" />
-                          Passwords do not match
-                        </>
+                        <XCircle className="h-3.5 w-3.5" />
                       )}
-                    </p>
+                      {passwordsMatch ? "Passwords match" : "Passwords do not match"}
+                    </div>
                   )}
                 </div>
 
                 <Button 
                   type="submit" 
                   className="w-full" 
-                  size="lg" 
+                  size="lg"
                   disabled={isLoading || !passwordsMatch || passwordStrength < 3}
                 >
                   {isLoading ? (
@@ -494,36 +539,19 @@ const ResetPassword = () => {
                       Updating Password...
                     </>
                   ) : (
-                    <>
-                      <Lock className="mr-2 h-4 w-4" />
-                      Update Password
-                    </>
+                    "Update Password"
                   )}
                 </Button>
               </form>
 
-              {/* Security Note */}
-              <div className="bg-primary/5 border border-primary/10 rounded-lg p-3 text-center">
-                <p className="text-xs text-muted-foreground">
-                  <Shield className="inline h-3.5 w-3.5 mr-1" />
-                  Your password is securely encrypted and never stored in plain text
-                </p>
+              <div className="text-center pt-2">
+                <Button variant="link" asChild className="text-sm">
+                  <Link to="/auth">Back to Sign In</Link>
+                </Button>
               </div>
             </CardContent>
           </Card>
         </motion.div>
-
-        <motion.p 
-          className="text-center text-sm text-muted-foreground mt-8"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-        >
-          Remember your password?{" "}
-          <Link to="/auth" className="underline hover:text-primary font-medium">
-            Sign In
-          </Link>
-        </motion.p>
       </div>
     </motion.div>
   );
