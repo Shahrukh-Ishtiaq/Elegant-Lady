@@ -12,6 +12,20 @@ import { toast } from "sonner";
 import { format, isToday, isYesterday, parseISO, startOfDay, endOfDay } from "date-fns";
 import { useRef } from "react";
 
+// HTML escape utility to prevent XSS attacks
+const escapeHtml = (text: string | undefined | null): string => {
+  if (!text) return '';
+  const map: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#x27;',
+    '/': '&#x2F;',
+  };
+  return String(text).replace(/[&<>"'/]/g, (char) => map[char]);
+};
+
 interface OrderItem {
   name: string;
   quantity: number;
@@ -265,17 +279,17 @@ export const AdminOrders = () => {
     <div class="grid">
       <div class="info-block">
         <div class="info-label">Customer Name</div>
-        <div class="info-value">${order.shipping_address?.firstName || ''} ${order.shipping_address?.lastName || ''}</div>
+        <div class="info-value">${escapeHtml(order.shipping_address?.firstName)} ${escapeHtml(order.shipping_address?.lastName)}</div>
         <div class="info-label" style="margin-top: 12px;">Email</div>
-        <div class="info-value">${order.shipping_address?.email || 'N/A'}</div>
+        <div class="info-value">${escapeHtml(order.shipping_address?.email) || 'N/A'}</div>
         <div class="info-label" style="margin-top: 12px;">Phone</div>
-        <div class="info-value">${order.shipping_address?.phone || 'N/A'}</div>
+        <div class="info-value">${escapeHtml(order.shipping_address?.phone) || 'N/A'}</div>
       </div>
       <div class="info-block">
         <div class="info-label">Shipping Address</div>
         <div class="info-value">
-          ${order.shipping_address?.address || ''}<br/>
-          ${order.shipping_address?.city || ''}${order.shipping_address?.state ? ', ' + order.shipping_address.state : ''}${order.shipping_address?.zip ? ' ' + order.shipping_address.zip : ''}
+          ${escapeHtml(order.shipping_address?.address)}<br/>
+          ${escapeHtml(order.shipping_address?.city)}${order.shipping_address?.state ? ', ' + escapeHtml(order.shipping_address.state) : ''}${order.shipping_address?.zip ? ' ' + escapeHtml(order.shipping_address.zip) : ''}
         </div>
         <div class="info-label" style="margin-top: 12px;">Payment Method</div>
         <div class="info-value">${order.payment_method === 'cod' ? 'Cash on Delivery' : 'Card Payment'}</div>
@@ -299,13 +313,13 @@ export const AdminOrders = () => {
           <tr>
             <td>
               <div class="product-cell">
-                ${item.image ? `<img src="${item.image}" class="product-image" alt="${item.name}" onerror="this.style.display='none'" />` : ''}
+                ${item.image ? `<img src="${escapeHtml(item.image)}" class="product-image" alt="${escapeHtml(item.name)}" onerror="this.style.display='none'" />` : ''}
                 <div>
-                  <div class="product-name">${item.name}</div>
+                  <div class="product-name">${escapeHtml(item.name)}</div>
                   <div class="product-details">
-                    ${item.selectedSize ? `Size: ${item.selectedSize}` : ''}
+                    ${item.selectedSize ? `Size: ${escapeHtml(item.selectedSize)}` : ''}
                     ${item.selectedSize && item.selectedColor ? ' • ' : ''}
-                    ${item.selectedColor ? `Color: ${item.selectedColor}` : ''}
+                    ${item.selectedColor ? `Color: ${escapeHtml(item.selectedColor)}` : ''}
                   </div>
                 </div>
               </div>
