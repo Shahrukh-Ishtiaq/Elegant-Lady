@@ -36,13 +36,39 @@ const Auth = () => {
   useEffect(() => {
     const handleOAuthCallback = async () => {
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const queryParams = new URLSearchParams(window.location.search);
+      
       const accessToken = hashParams.get("access_token");
       const type = hashParams.get("type");
-      const errorDescription = hashParams.get("error_description");
+      const errorDescription = hashParams.get("error_description") || queryParams.get("error_description");
+      const errorCode = hashParams.get("error") || queryParams.get("error");
 
-      // Handle error from OAuth
-      if (errorDescription) {
-        toast.error(decodeURIComponent(errorDescription.replace(/\+/g, ' ')));
+      console.log('OAuth callback - checking params:', { 
+        hasAccessToken: !!accessToken, 
+        type, 
+        errorCode,
+        errorDescription 
+      });
+
+      // Handle error from OAuth - check both hash and query params
+      if (errorDescription || errorCode) {
+        const errorMsg = errorDescription 
+          ? decodeURIComponent(errorDescription.replace(/\+/g, ' '))
+          : errorCode;
+        
+        console.error('OAuth error:', errorMsg);
+        
+        // Handle specific exchange code error
+        if (errorMsg?.includes('exchange') || errorMsg?.includes('code')) {
+          toast.error(
+            "Google sign-in failed. Please try again or use email/password.",
+            { duration: 5000 }
+          );
+        } else {
+          toast.error(errorMsg || "Authentication failed");
+        }
+        
+        // Clear error params from URL
         window.history.replaceState(null, '', window.location.pathname);
         return;
       }
@@ -58,7 +84,36 @@ const Auth = () => {
       if (accessToken && type !== "recovery") {
         setIsProcessingOAuth(true);
         try {
-          // Let Supabase handle the session from the URL
+          console.log('Processing OAuth callback with access token...');
+          
+          // First set the session from URL tokens
+          const refreshToken = hashParams.get("refresh_token");
+          
+          if (refreshToken) {
+            const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            
+            if (sessionError) {
+              console.error('Session set error:', sessionError);
+              toast.error("Failed to complete sign in. Please try again.");
+              setIsProcessingOAuth(false);
+              return;
+            }
+            
+            if (sessionData.session) {
+              console.log('OAuth session established for:', sessionData.session.user.email);
+              // Clear the hash from URL
+              window.history.replaceState(null, '', window.location.pathname);
+              toast.success("Welcome to DAISY!");
+              // Navigate to home
+              navigate("/", { replace: true });
+              return;
+            }
+          }
+          
+          // Fallback: Let Supabase handle the session from the URL
           const { data, error } = await supabase.auth.getSession();
           
           if (error) {
@@ -69,6 +124,7 @@ const Auth = () => {
           }
 
           if (data.session) {
+            console.log('OAuth session retrieved for:', data.session.user.email);
             // Clear the hash from URL
             window.history.replaceState(null, '', window.location.pathname);
             toast.success("Welcome to DAISY!");
@@ -129,7 +185,10 @@ const Auth = () => {
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
+      // Use the production URL for redirect
       const redirectUrl = `${window.location.origin}/auth`;
+      
+      console.log('Starting Google OAuth with redirect:', redirectUrl);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -145,19 +204,36 @@ const Auth = () => {
       
       if (error) {
         console.error('Google sign in error:', error);
-        if (error.message.includes('Unable to exchange')) {
-          toast.error("Google sign-in is not configured. Please use email/password or contact support.");
+        
+        // Handle exchange code error specifically
+        if (error.message.includes('Unable to exchange') || error.message.includes('exchange external code')) {
+          toast.error(
+            "Google sign-in configuration issue. The admin needs to verify Google OAuth settings in the backend. Please use email/password for now.",
+            { duration: 6000 }
+          );
+        } else if (error.message.includes('provider is not enabled')) {
+          toast.error("Google sign-in is not enabled. Please use email/password.");
         } else {
           toast.error(error.message || "Failed to sign in with Google");
         }
         setIsGoogleLoading(false);
       } else if (data?.url) {
         // Redirect to Google OAuth URL
+        console.log('Redirecting to Google OAuth...');
         window.location.href = data.url;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Google sign in error:', error);
-      toast.error("Failed to sign in with Google. Please try again.");
+      
+      // Check if this is the exchange code error
+      if (error?.message?.includes('exchange') || error?.message?.includes('code')) {
+        toast.error(
+          "Google authentication failed. Please try again or use email/password.",
+          { duration: 5000 }
+        );
+      } else {
+        toast.error("Failed to sign in with Google. Please try again.");
+      }
       setIsGoogleLoading(false);
     }
   };
