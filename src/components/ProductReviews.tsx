@@ -105,9 +105,11 @@ export const ProductReviews = ({ productId, productRating, reviewCount }: Produc
 
   const fetchReviews = async () => {
     try {
+      // Only select necessary fields - exclude user_id from public exposure
+      // user_id is only needed for ownership checks (edit/delete)
       const { data, error } = await supabase
         .from('reviews')
-        .select('*')
+        .select('id, product_id, user_id, user_name, rating, comment, helpful_count, created_at')
         .eq('product_id', productId)
         .order('created_at', { ascending: false });
 
