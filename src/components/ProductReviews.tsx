@@ -21,15 +21,20 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-interface Review {
+// Review interface for display (public view - no user_id exposed)
+interface PublicReview {
   id: string;
   product_id: string;
-  user_id: string | null;
   user_name: string;
   rating: number;
   comment: string;
   helpful_count: number;
   created_at: string;
+}
+
+// Extended review interface for authenticated users (includes user_id for ownership)
+interface Review extends PublicReview {
+  user_id: string | null;
 }
 
 interface ProductReviewsProps {
@@ -101,47 +106,66 @@ export const ProductReviews = ({ productId, productRating, reviewCount }: Produc
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [productId]);
+  }, [productId, user]);
 
   const fetchReviews = async () => {
     try {
-      // Only select necessary fields - exclude user_id from public exposure
-      // user_id is only needed for ownership checks (edit/delete)
-      const { data, error } = await supabase
-        .from('reviews')
-        .select('id, product_id, user_id, user_name, rating, comment, helpful_count, created_at')
-        .eq('product_id', productId)
-        .order('created_at', { ascending: false });
+      // Use the public_reviews view for anonymous users (hides user_id)
+      // Use reviews table for authenticated users (includes user_id for ownership checks)
+      if (user) {
+        // Authenticated: can see user_id for edit/delete functionality
+        const { data, error } = await supabase
+          .from('reviews')
+          .select('id, product_id, user_id, user_name, rating, comment, helpful_count, created_at')
+          .eq('product_id', productId)
+          .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      const reviewsData = data || [];
-      setReviews(reviewsData);
-      
-      // Sync product rating/review_count if there's a mismatch
-      if (reviewsData.length > 0) {
-        const avgRating = reviewsData.reduce((sum, r) => sum + r.rating, 0) / reviewsData.length;
-        const roundedRating = Math.round(avgRating * 10) / 10;
-        
-        if (roundedRating !== productRating || reviewsData.length !== reviewCount) {
-          await supabase
-            .from('products')
-            .update({ 
-              rating: roundedRating, 
-              review_count: reviewsData.length 
-            })
-            .eq('id', productId);
-        }
-      } else if (reviewCount > 0) {
-        // Reset stats if no reviews
-        await supabase
-          .from('products')
-          .update({ rating: 0, review_count: 0 })
-          .eq('id', productId);
+        if (error) throw error;
+        const reviewsData = (data || []) as Review[];
+        setReviews(reviewsData);
+        await syncProductStats(reviewsData);
+      } else {
+        // Anonymous: use public view that hides user_id
+        const { data, error } = await supabase
+          .from('public_reviews')
+          .select('id, product_id, user_name, rating, comment, helpful_count, created_at')
+          .eq('product_id', productId)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        // Add null user_id for type compatibility
+        const reviewsData = (data || []).map(r => ({ ...r, user_id: null })) as Review[];
+        setReviews(reviewsData);
+        await syncProductStats(reviewsData);
       }
     } catch (error) {
       console.error('Error fetching reviews:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const syncProductStats = async (reviewsData: Review[]) => {
+    // Sync product rating/review_count if there's a mismatch
+    if (reviewsData.length > 0) {
+      const avgRating = reviewsData.reduce((sum, r) => sum + r.rating, 0) / reviewsData.length;
+      const roundedRating = Math.round(avgRating * 10) / 10;
+      
+      if (roundedRating !== productRating || reviewsData.length !== reviewCount) {
+        await supabase
+          .from('products')
+          .update({ 
+            rating: roundedRating, 
+            review_count: reviewsData.length 
+          })
+          .eq('id', productId);
+      }
+    } else if (reviewCount > 0) {
+      // Reset stats if no reviews
+      await supabase
+        .from('products')
+        .update({ rating: 0, review_count: 0 })
+        .eq('id', productId);
     }
   };
 
