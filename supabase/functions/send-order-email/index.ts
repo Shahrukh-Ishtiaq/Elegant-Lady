@@ -87,7 +87,7 @@ interface OrderEmailRequest {
   total: number;
   shippingAddress: ShippingAddress;
   paymentMethod: string;
-  adminEmail?: string;
+  // Note: adminEmail removed - admin notification email is now server-side only
 }
 
 async function sendAdminNotification(
@@ -223,8 +223,8 @@ const handler = async (req: Request): Promise<Response> => {
       items, 
       total, 
       shippingAddress, 
-      paymentMethod,
-      adminEmail
+      paymentMethod
+      // Note: adminEmail removed from destructuring - now server-side only
     }: OrderEmailRequest = await req.json();
 
     // Input validation
@@ -394,8 +394,8 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Customer email sent successfully:", emailResponse);
 
-    // Send admin notification email
-    const targetAdminEmail = adminEmail || ADMIN_EMAIL;
+    // Send admin notification email - always use server-side configured ADMIN_EMAIL
+    // This prevents client-side override attacks (data exfiltration via custom admin email)
     try {
       await sendAdminNotification(
         orderId,
@@ -405,7 +405,7 @@ const handler = async (req: Request): Promise<Response> => {
         total,
         shippingAddress,
         paymentMethod,
-        targetAdminEmail
+        ADMIN_EMAIL  // Always use server-side constant, never client-provided value
       );
     } catch (adminError) {
       console.error("Admin notification failed but customer email sent:", adminError);
