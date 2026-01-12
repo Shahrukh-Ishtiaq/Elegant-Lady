@@ -171,8 +171,8 @@ export const AdminOrders = () => {
       
       const typedOrders = (data || []).map(order => ({
         ...order,
-        shipping_address: order.shipping_address as Order['shipping_address'],
-        items: order.items as Order['items'],
+        shipping_address: order.shipping_address as unknown as Order['shipping_address'],
+        items: order.items as unknown as Order['items'],
       }));
       
       setOrders(typedOrders);
