@@ -161,16 +161,55 @@ const ResetPassword = () => {
 
     try {
       console.log("Updating password...");
-      const { error } = await supabase.auth.updateUser({ password });
+      
+      // First, ensure we have a fresh session before updating
+      const { data: sessionData } = await supabase.auth.getSession();
+      
+      if (!sessionData.session) {
+        console.error("No active session found");
+        setTokenExpired(true);
+        setIsValidToken(false);
+        toast.error("Your session has expired. Please request a new password reset link.");
+        return;
+      }
+
+      // Update password with nonce to ensure fresh update
+      const { error } = await supabase.auth.updateUser({ 
+        password,
+        nonce: crypto.randomUUID() // Add nonce to force fresh update
+      });
 
       if (error) {
         console.error("Password update error:", error);
+        
+        // Handle specific error cases
         if (error.message.includes("expired") || error.message.includes("invalid") || error.message.includes("session")) {
           setTokenExpired(true);
           setIsValidToken(false);
           toast.error("Your session has expired. Please request a new password reset link.");
-        } else if (error.message.includes("same as") || error.message.includes("different")) {
-          toast.error("New password must be different from your current password");
+        } else if (error.message.includes("same as") || error.message.includes("different") || error.message.includes("should be different")) {
+          // This error means Supabase detected same password - provide clearer guidance
+          toast.error("Please choose a completely new password that you haven't used before on this account.", { duration: 5000 });
+        } else if (error.message.includes("reauthentication")) {
+          // Session needs refresh - try to refresh and retry
+          const { error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError) {
+            setTokenExpired(true);
+            setIsValidToken(false);
+            toast.error("Session expired. Please request a new password reset link.");
+          } else {
+            // Retry password update after refresh
+            const { error: retryError } = await supabase.auth.updateUser({ password });
+            if (retryError) {
+              toast.error(retryError.message || "Failed to update password");
+            } else {
+              console.log("Password updated successfully on retry!");
+              setIsSuccess(true);
+              toast.success("Password updated successfully!");
+              setTimeout(() => navigate("/", { replace: true }), 2500);
+            }
+          }
+          return;
         } else {
           toast.error(error.message || "Failed to update password");
         }
