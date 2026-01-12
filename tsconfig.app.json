@@ -17,7 +17,7 @@
     /* 🔥 THIS IS THE FIX 🔥 */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["/src/*"]
+      "@/*": ["./src/*"]
     },
 
     /* Linting */
