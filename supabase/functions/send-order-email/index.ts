@@ -4,6 +4,30 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
+// HTML entity escaping for XSS prevention in email templates
+function escapeHtml(unsafe: string): string {
+  if (typeof unsafe !== 'string') return '';
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// Sanitize a string for safe use in HTML email templates
+function sanitizeForEmail(input: string | undefined | null): string {
+  if (!input || typeof input !== 'string') return '';
+  // Trim, limit length, and escape HTML
+  return escapeHtml(input.trim().substring(0, 500));
+}
+
+// Sanitize numeric values
+function sanitizeNumber(input: number | string): number {
+  const num = typeof input === 'string' ? parseFloat(input) : input;
+  return isNaN(num) ? 0 : num;
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -78,15 +102,37 @@ async function sendAdminNotification(
 ) {
   console.log("Sending admin notification to:", adminEmail);
   
-  const itemsList = items.map(item => 
-    `• ${item.name} (Qty: ${item.quantity}) - PKR ${(item.price * item.quantity).toLocaleString()}`
-  ).join('<br>');
+  // Sanitize all user inputs for safe HTML rendering
+  const safeCustomerName = sanitizeForEmail(customerName);
+  const safeCustomerEmail = sanitizeForEmail(customerEmail);
+  const safeOrderId = sanitizeForEmail(orderId);
+  const safeTotal = sanitizeNumber(total);
+  const safePaymentMethod = sanitizeForEmail(paymentMethod);
+  
+  // Sanitize shipping address
+  const safeAddress = {
+    firstName: sanitizeForEmail(shippingAddress.firstName),
+    lastName: sanitizeForEmail(shippingAddress.lastName),
+    phone: sanitizeForEmail(shippingAddress.phone),
+    address: sanitizeForEmail(shippingAddress.address),
+    city: sanitizeForEmail(shippingAddress.city),
+    state: sanitizeForEmail(shippingAddress.state),
+    zip: sanitizeForEmail(shippingAddress.zip),
+  };
+  
+  // Sanitize item names and ensure numeric values are safe
+  const itemsList = items.map(item => {
+    const safeName = sanitizeForEmail(item.name);
+    const safeQty = sanitizeNumber(item.quantity);
+    const safePrice = sanitizeNumber(item.price);
+    return `• ${safeName} (Qty: ${safeQty}) - PKR ${(safePrice * safeQty).toLocaleString()}`;
+  }).join('<br>');
 
   try {
     const response = await resend.emails.send({
       from: "DAISY Orders <onboarding@resend.dev>",
       to: [adminEmail],
-      subject: `🛒 New Order #${orderId.slice(0, 8).toUpperCase()} - PKR ${total.toLocaleString()}`,
+      subject: `🛒 New Order #${safeOrderId.slice(0, 8).toUpperCase()} - PKR ${safeTotal.toLocaleString()}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -104,16 +150,16 @@ async function sendAdminNotification(
             <div style="padding: 30px;">
               <div style="background: linear-gradient(135deg, #d4a5a5 0%, #e8c4c4 100%); padding: 20px; border-radius: 12px; margin-bottom: 24px; text-align: center;">
                 <p style="margin: 0; font-size: 14px; color: #333; font-weight: 600;">Order Number</p>
-                <p style="margin: 8px 0 0; font-size: 24px; font-weight: 700; color: #1a1a2e; letter-spacing: 2px;">#${orderId.slice(0, 8).toUpperCase()}</p>
-                <p style="margin: 12px 0 0; font-size: 28px; font-weight: 700; color: #1a1a2e;">PKR ${total.toLocaleString()}</p>
+                <p style="margin: 8px 0 0; font-size: 24px; font-weight: 700; color: #1a1a2e; letter-spacing: 2px;">#${safeOrderId.slice(0, 8).toUpperCase()}</p>
+                <p style="margin: 12px 0 0; font-size: 28px; font-weight: 700; color: #1a1a2e;">PKR ${safeTotal.toLocaleString()}</p>
               </div>
               
               <div style="margin-bottom: 24px;">
                 <h3 style="color: #333; margin: 0 0 12px; font-size: 16px; border-bottom: 2px solid #d4a5a5; padding-bottom: 8px;">👤 Customer Details</h3>
                 <p style="margin: 0; line-height: 1.8; color: #555;">
-                  <strong>Name:</strong> ${customerName}<br>
-                  <strong>Email:</strong> ${customerEmail}<br>
-                  <strong>Phone:</strong> ${shippingAddress.phone}
+                  <strong>Name:</strong> ${safeCustomerName}<br>
+                  <strong>Email:</strong> ${safeCustomerEmail}<br>
+                  <strong>Phone:</strong> ${safeAddress.phone}
                 </p>
               </div>
               
@@ -125,16 +171,16 @@ async function sendAdminNotification(
               <div style="margin-bottom: 24px;">
                 <h3 style="color: #333; margin: 0 0 12px; font-size: 16px; border-bottom: 2px solid #d4a5a5; padding-bottom: 8px;">📍 Shipping Address</h3>
                 <p style="margin: 0; line-height: 1.6; color: #555;">
-                  ${shippingAddress.firstName} ${shippingAddress.lastName}<br>
-                  ${shippingAddress.address}<br>
-                  ${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.zip}
+                  ${safeAddress.firstName} ${safeAddress.lastName}<br>
+                  ${safeAddress.address}<br>
+                  ${safeAddress.city}, ${safeAddress.state} ${safeAddress.zip}
                 </p>
               </div>
               
               <div style="margin-bottom: 24px;">
                 <h3 style="color: #333; margin: 0 0 12px; font-size: 16px; border-bottom: 2px solid #d4a5a5; padding-bottom: 8px;">💳 Payment Method</h3>
                 <p style="margin: 0; color: #555; font-weight: 600;">
-                  ${paymentMethod === 'cod' ? '💵 Cash on Delivery' : '💳 Credit/Debit Card'}
+                  ${safePaymentMethod === 'cod' ? '💵 Cash on Delivery' : '💳 Credit/Debit Card'}
                 </p>
               </div>
               
@@ -228,25 +274,49 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Processing order email for:", customerEmail);
 
-    const itemsHtml = items.map(item => `
+    // Sanitize all user inputs for the customer email
+    const safeCustomerName = sanitizeForEmail(customerName);
+    const safeOrderId = sanitizeForEmail(orderId);
+    const safeTotal = sanitizeNumber(total);
+    const safePaymentMethod = sanitizeForEmail(paymentMethod);
+    
+    // Sanitize shipping address for customer email
+    const safeAddress = {
+      firstName: sanitizeForEmail(shippingAddress.firstName),
+      lastName: sanitizeForEmail(shippingAddress.lastName),
+      phone: sanitizeForEmail(shippingAddress.phone),
+      address: sanitizeForEmail(shippingAddress.address),
+      city: sanitizeForEmail(shippingAddress.city),
+      state: sanitizeForEmail(shippingAddress.state),
+      zip: sanitizeForEmail(shippingAddress.zip),
+    };
+
+    const itemsHtml = items.map(item => {
+      const safeName = sanitizeForEmail(item.name);
+      const safeSize = item.selectedSize ? sanitizeForEmail(item.selectedSize) : '';
+      const safeColor = item.selectedColor ? sanitizeForEmail(item.selectedColor) : '';
+      const safeQty = sanitizeNumber(item.quantity);
+      const safePrice = sanitizeNumber(item.price);
+      return `
       <tr>
         <td style="padding: 12px; border-bottom: 1px solid #eee;">
-          <p style="margin: 0; font-weight: 600; color: #333;">${item.name}</p>
+          <p style="margin: 0; font-weight: 600; color: #333;">${safeName}</p>
           <p style="margin: 4px 0 0; font-size: 12px; color: #666;">
-            ${item.selectedSize ? `Size: ${item.selectedSize}` : ''} 
-            ${item.selectedColor ? `| Color: ${item.selectedColor}` : ''}
+            ${safeSize ? `Size: ${safeSize}` : ''} 
+            ${safeColor ? `| Color: ${safeColor}` : ''}
           </p>
         </td>
-        <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right; font-weight: 600;">PKR ${(item.price * item.quantity).toLocaleString()}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center;">${safeQty}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right; font-weight: 600;">PKR ${(safePrice * safeQty).toLocaleString()}</td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
 
     // Send customer confirmation email
     const emailResponse = await resend.emails.send({
       from: "DAISY <onboarding@resend.dev>",
       to: [customerEmail],
-      subject: `Order Confirmed - #${orderId.slice(0, 8).toUpperCase()}`,
+      subject: `Order Confirmed - #${safeOrderId.slice(0, 8).toUpperCase()}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -264,12 +334,12 @@ const handler = async (req: Request): Promise<Response> => {
             <div style="padding: 40px 30px;">
               <div style="text-align: center; margin-bottom: 30px;">
                 <h2 style="color: #333; margin: 0 0 8px; font-size: 24px;">Thank You for Your Order!</h2>
-                <p style="color: #666; margin: 0;">Hi ${customerName}, your order has been confirmed.</p>
+                <p style="color: #666; margin: 0;">Hi ${safeCustomerName}, your order has been confirmed.</p>
               </div>
               
               <div style="background-color: #f9f5f3; padding: 20px; border-radius: 12px; margin-bottom: 24px;">
                 <p style="margin: 0 0 8px; font-size: 14px; color: #666;">Order Number</p>
-                <p style="margin: 0; font-size: 18px; font-weight: 600; color: #333; letter-spacing: 1px;">#${orderId.slice(0, 8).toUpperCase()}</p>
+                <p style="margin: 0; font-size: 18px; font-weight: 600; color: #333; letter-spacing: 1px;">#${safeOrderId.slice(0, 8).toUpperCase()}</p>
               </div>
               
               <h3 style="color: #333; margin: 0 0 16px; font-size: 18px; border-bottom: 2px solid #d4a5a5; padding-bottom: 8px;">Order Details</h3>
@@ -285,7 +355,7 @@ const handler = async (req: Request): Promise<Response> => {
                 <tfoot>
                   <tr>
                     <td colspan="2" style="padding: 16px 12px; text-align: right; font-weight: 600; font-size: 18px; color: #333;">Total</td>
-                    <td style="padding: 16px 12px; text-align: right; font-weight: 700; font-size: 20px; color: #d4a5a5;">PKR ${total.toLocaleString()}</td>
+                    <td style="padding: 16px 12px; text-align: right; font-weight: 700; font-size: 20px; color: #d4a5a5;">PKR ${safeTotal.toLocaleString()}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -293,16 +363,16 @@ const handler = async (req: Request): Promise<Response> => {
               <div style="margin-bottom: 24px;">
                 <h4 style="color: #333; margin: 0 0 12px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Shipping Address</h4>
                 <p style="color: #666; margin: 0; line-height: 1.6;">
-                  ${shippingAddress.firstName} ${shippingAddress.lastName}<br>
-                  ${shippingAddress.address}<br>
-                  ${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.zip}<br>
-                  Phone: ${shippingAddress.phone}
+                  ${safeAddress.firstName} ${safeAddress.lastName}<br>
+                  ${safeAddress.address}<br>
+                  ${safeAddress.city}, ${safeAddress.state} ${safeAddress.zip}<br>
+                  Phone: ${safeAddress.phone}
                 </p>
               </div>
               
               <div style="margin-bottom: 24px;">
                 <h4 style="color: #333; margin: 0 0 12px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Payment Method</h4>
-                <p style="color: #666; margin: 0;">${paymentMethod === 'cod' ? 'Cash on Delivery' : 'Credit/Debit Card'}</p>
+                <p style="color: #666; margin: 0;">${safePaymentMethod === 'cod' ? 'Cash on Delivery' : 'Credit/Debit Card'}</p>
               </div>
               
               <div style="background-color: #f9f5f3; padding: 20px; border-radius: 12px; text-align: center;">
