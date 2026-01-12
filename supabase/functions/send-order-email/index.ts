@@ -36,28 +36,6 @@ const corsHeaders = {
 // Admin email for notifications
 const ADMIN_EMAIL = "admin@daisy.com";
 
-// Simple in-memory rate limiting (resets on function cold start)
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-const RATE_LIMIT = 5;
-const RATE_LIMIT_WINDOW = 60 * 60 * 1000;
-
-function isRateLimited(email: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(email);
-  
-  if (!entry || now > entry.resetTime) {
-    rateLimitMap.set(email, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
-    return false;
-  }
-  
-  if (entry.count >= RATE_LIMIT) {
-    return true;
-  }
-  
-  entry.count++;
-  return false;
-}
-
 interface OrderItem {
   id: string;
   name: string;
@@ -87,7 +65,6 @@ interface OrderEmailRequest {
   total: number;
   shippingAddress: ShippingAddress;
   paymentMethod: string;
-  // Note: adminEmail removed - admin notification email is now server-side only
 }
 
 async function sendAdminNotification(
@@ -216,6 +193,39 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // JWT Authentication - verify the user is authenticated
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      console.error("Missing or invalid Authorization header");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    
+    // Create client with user's auth token for verification
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    // Verify the JWT token by getting user
+    const { data: userData, error: userError } = await supabaseAuth.auth.getUser();
+    
+    if (userError || !userData?.user) {
+      console.error("JWT verification failed:", userError);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const userId = userData.user.id;
+    console.log("Authenticated user:", userId);
+
     const { 
       orderId, 
       customerEmail, 
@@ -224,7 +234,6 @@ const handler = async (req: Request): Promise<Response> => {
       total, 
       shippingAddress, 
       paymentMethod
-      // Note: adminEmail removed from destructuring - now server-side only
     }: OrderEmailRequest = await req.json();
 
     // Input validation
@@ -244,8 +253,24 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Rate limiting check
-    if (isRateLimited(customerEmail)) {
+    // Use service role client for database operations
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Database-backed rate limiting using check_rate_limit function
+    const { data: rateLimitAllowed, error: rateLimitError } = await supabase.rpc(
+      'check_rate_limit',
+      {
+        p_identifier: customerEmail,
+        p_endpoint: 'send_order_email',
+        p_max_requests: 5,
+        p_window_minutes: 60
+      }
+    );
+
+    if (rateLimitError) {
+      console.error("Rate limit check failed:", rateLimitError);
+      // Continue on error - don't block legitimate requests due to rate limit errors
+    } else if (rateLimitAllowed === false) {
       console.warn(`Rate limit exceeded for email: ${customerEmail}`);
       return new Response(
         JSON.stringify({ error: "Too many email requests. Please try again later." }),
@@ -253,14 +278,10 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Verify order exists in database
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
+    // Verify order exists in database and belongs to the authenticated user
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .select("id, status")
+      .select("id, status, user_id")
       .eq("id", orderId)
       .single();
 
@@ -269,6 +290,15 @@ const handler = async (req: Request): Promise<Response> => {
       return new Response(
         JSON.stringify({ error: "Order not found" }),
         { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Verify the order belongs to the authenticated user
+    if (order.user_id !== userId) {
+      console.error("User not authorized to access this order:", { userId, orderUserId: order.user_id });
+      return new Response(
+        JSON.stringify({ error: "Unauthorized - order does not belong to user" }),
+        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
@@ -395,7 +425,6 @@ const handler = async (req: Request): Promise<Response> => {
     console.log("Customer email sent successfully:", emailResponse);
 
     // Send admin notification email - always use server-side configured ADMIN_EMAIL
-    // This prevents client-side override attacks (data exfiltration via custom admin email)
     try {
       await sendAdminNotification(
         orderId,
@@ -405,7 +434,7 @@ const handler = async (req: Request): Promise<Response> => {
         total,
         shippingAddress,
         paymentMethod,
-        ADMIN_EMAIL  // Always use server-side constant, never client-provided value
+        ADMIN_EMAIL
       );
     } catch (adminError) {
       console.error("Admin notification failed but customer email sent:", adminError);

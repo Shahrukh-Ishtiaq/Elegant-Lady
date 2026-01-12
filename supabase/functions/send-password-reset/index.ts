@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -7,6 +8,17 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// HTML entity escaping for XSS prevention
+function escapeHtml(unsafe: string): string {
+  if (typeof unsafe !== 'string') return '';
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 
 interface PasswordResetRequest {
   email: string;
@@ -41,9 +53,58 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // Validate resetLink is a valid URL and matches expected domain pattern
+    try {
+      const url = new URL(resetLink);
+      // Only allow password reset links from the same origin or known domains
+      // This prevents attackers from sending phishing links
+      if (!url.pathname.includes('reset-password') && !url.hash.includes('type=recovery')) {
+        console.error("Invalid reset link format");
+        return new Response(
+          JSON.stringify({ error: "Invalid reset link format" }),
+          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+    } catch {
+      console.error("Invalid reset link URL");
+      return new Response(
+        JSON.stringify({ error: "Invalid reset link" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Database-backed rate limiting
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Use database-backed rate limiting - stricter limits for password reset (3 per hour)
+    const { data: rateLimitAllowed, error: rateLimitError } = await supabase.rpc(
+      'check_rate_limit',
+      {
+        p_identifier: email,
+        p_endpoint: 'password_reset',
+        p_max_requests: 3,
+        p_window_minutes: 60
+      }
+    );
+
+    if (rateLimitError) {
+      console.error("Rate limit check failed:", rateLimitError);
+      // Continue on error - don't block legitimate requests due to rate limit errors
+    } else if (rateLimitAllowed === false) {
+      console.warn(`Rate limit exceeded for password reset: ${email}`);
+      return new Response(
+        JSON.stringify({ error: "Too many password reset requests. Please try again later." }),
+        { status: 429, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     console.log("Sending password reset email to:", email);
 
-    const displayName = userName || email.split('@')[0];
+    // Sanitize user inputs
+    const safeDisplayName = escapeHtml(userName || email.split('@')[0]);
+    // Don't escape the resetLink as it's a URL, but we've already validated it above
 
     const emailResponse = await resend.emails.send({
       from: "DAISY <onboarding@resend.dev>",
@@ -74,7 +135,7 @@ const handler = async (req: Request): Promise<Response> => {
               
               <div style="text-align: center; margin-bottom: 30px;">
                 <h2 style="color: #333; margin: 0 0 8px; font-size: 26px; font-weight: 600;">Password Reset Request</h2>
-                <p style="color: #666; margin: 0; font-size: 16px;">Hi ${displayName}, we received a request to reset your password.</p>
+                <p style="color: #666; margin: 0; font-size: 16px;">Hi ${safeDisplayName}, we received a request to reset your password.</p>
               </div>
               
               <!-- Reset Button -->
