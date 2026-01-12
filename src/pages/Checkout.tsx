@@ -166,9 +166,9 @@ const Checkout = () => {
         setIsSubmitting(false);
         return;
       }
-
-      // Extract order ID from response
-      const orderId = data?.order_id;
+      // Extract order ID from response (cast to proper type)
+      const responseData = data as { order_id?: string } | null;
+      const orderId = responseData?.order_id;
 
       // Send order confirmation email
       if (orderId) {
