@@ -7,6 +7,7 @@ import { CartProvider } from "./contexts/CartContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ScrollToTop } from "./components/ScrollToTop";
 import { WhatsAppButton } from "./components/WhatsAppButton";
+import { ProtectedAdminRoute } from "./components/ProtectedAdminRoute";
 import Home from "./pages/Home";
 import Shop from "./pages/Shop";
 import ProductDetail from "./pages/ProductDetail";
@@ -43,7 +44,7 @@ const App = () => (
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin" element={<ProtectedAdminRoute><AdminDashboard /></ProtectedAdminRoute>} />
               <Route path="/my-orders" element={<MyOrders />} />
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />
