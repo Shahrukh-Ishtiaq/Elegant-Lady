@@ -408,6 +408,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_order_atomic: {
+        Args: {
+          p_items: Json
+          p_payment_method: string
+          p_shipping_address: Json
+          p_total: number
+          p_user_id: string
+        }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

@@ -101,6 +101,13 @@ const Checkout = () => {
       return;
     }
 
+    // Ensure user is logged in (guest checkout disabled)
+    if (!user?.id) {
+      toast.error("Please sign in to complete your order");
+      navigate("/auth");
+      return;
+    }
+
     // Validate form data with zod
     const validationResult = checkoutSchema.safeParse(formData);
     if (!validationResult.success) {
@@ -112,76 +119,60 @@ const Checkout = () => {
     setIsSubmitting(true);
 
     try {
-      // Check stock availability before placing order
-      for (const item of cart) {
-        const { data: product, error: stockError } = await supabase
-          .from("products")
-          .select("stock_quantity, in_stock, name")
-          .eq("id", item.id)
-          .single();
+      // Prepare order items for atomic function
+      const orderItems = cart.map(item => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        selectedSize: item.selectedSize,
+        selectedColor: item.selectedColor,
+        image: item.images[0],
+      }));
 
-        if (stockError) throw stockError;
-
-        if (!product.in_stock || product.stock_quantity < item.quantity) {
-          toast.error(`Sorry, "${product.name}" is no longer available in the requested quantity.`);
-          setIsSubmitting(false);
-          return;
-        }
-      }
-
-      const orderData = {
-        user_id: user?.id || null,
-        status: "pending",
-        total: total,
-        shipping_address: {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          phone: formData.phone,
-          address: formData.address,
-          city: formData.city,
-          state: formData.state,
-          zip: formData.zip,
-        },
-        payment_method: paymentMethod,
-        items: cart.map(item => ({
-          id: item.id,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          selectedSize: item.selectedSize,
-          selectedColor: item.selectedColor,
-          image: item.images[0],
-        })),
+      // Prepare shipping address
+      const shippingAddress = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        zip: formData.zip,
       };
 
-      const { data, error } = await supabase.from("orders").insert(orderData).select().single();
+      // Use atomic database function to prevent race conditions
+      const { data, error } = await supabase.rpc('create_order_atomic', {
+        p_user_id: user.id,
+        p_total: total,
+        p_shipping_address: shippingAddress,
+        p_payment_method: paymentMethod,
+        p_items: orderItems,
+      });
 
-      if (error) throw error;
-
-      // Update stock quantities after successful order
-      for (const item of cart) {
-        const { data: product } = await supabase
-          .from("products")
-          .select("stock_quantity")
-          .eq("id", item.id)
-          .single();
-
-        if (product) {
-          const newQuantity = product.stock_quantity - item.quantity;
-          await supabase
-            .from("products")
-            .update({
-              stock_quantity: newQuantity,
-              in_stock: newQuantity > 0,
-            })
-            .eq("id", item.id);
+      if (error) {
+        // Handle specific error messages from the atomic function
+        if (error.message.includes('Insufficient stock')) {
+          toast.error(error.message);
+        } else if (error.message.includes('not available')) {
+          toast.error(error.message);
+        } else if (error.message.includes('must be logged in')) {
+          toast.error("Please sign in to complete your order");
+          navigate("/auth");
+        } else {
+          throw error;
         }
+        setIsSubmitting(false);
+        return;
       }
 
+      // Extract order ID from response
+      const orderId = data?.order_id;
+
       // Send order confirmation email
-      if (data?.id) {
-        await sendOrderConfirmationEmail(data.id);
+      if (orderId) {
+        await sendOrderConfirmationEmail(orderId);
       }
 
       const paymentMsg = paymentMethod === "card" 
@@ -194,9 +185,9 @@ const Checkout = () => {
       setTimeout(() => {
         navigate("/");
       }, 2000);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Order error:", error);
-      toast.error("Failed to place order. Please try again.");
+      toast.error(error.message || "Failed to place order. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
