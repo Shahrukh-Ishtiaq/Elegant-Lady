@@ -14,6 +14,8 @@ import { useCart } from "@/contexts/CartContext";
 import { StarRating } from "@/components/StarRating";
 import { ProductReviews } from "@/components/ProductReviews";
 import { SizeGuidePopup } from "@/components/SizeGuidePopup";
+import { usePromotions } from "@/hooks/usePromotions";
+import { PromoSidebar } from "@/components/promotions/PromoSidebar";
 
 interface Product {
   id: string;
@@ -36,6 +38,7 @@ interface Product {
 const ProductDetail = () => {
   const { id } = useParams();
   const { cart, addToCart, toggleWishlist, isInWishlist } = useCart();
+  const { promotions } = usePromotions();
   
   const [product, setProduct] = useState<Product | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
@@ -376,6 +379,13 @@ const ProductDetail = () => {
                 </p>
               </div>
             </div>
+
+            {/* Promo Sidebar */}
+            {promotions.length > 0 && (
+              <div className="border-t pt-6">
+                <PromoSidebar promotions={promotions} />
+              </div>
+            )}
           </motion.div>
         </div>
 
