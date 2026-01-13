@@ -14,6 +14,8 @@ import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { StarRating } from "@/components/StarRating";
 import { toast } from "sonner";
+import { usePromotions } from "@/hooks/usePromotions";
+import { PromoBanner } from "@/components/promotions/PromoBanner";
 
 interface Product {
   id: string;
@@ -56,6 +58,7 @@ const Shop = () => {
   
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const { cart, addToCart, toggleWishlist, isInWishlist, wishlist } = useCart();
+  const { activePromo } = usePromotions();
   const { user } = useAuth();
 
   // Sync category filter from URL params
@@ -260,6 +263,9 @@ const Shop = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
+        {/* Shop Promo Banner */}
+        {activePromo && <PromoBanner promotion={activePromo} />}
+
         {/* Header */}
         <motion.div 
           className="mb-8"

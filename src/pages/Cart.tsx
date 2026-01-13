@@ -5,9 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Minus, Plus, Trash2, ShoppingBag } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
+import { usePromotions } from "@/hooks/usePromotions";
+import { CartPromo } from "@/components/promotions/CartPromo";
+import { PromoBanner } from "@/components/promotions/PromoBanner";
 
 const Cart = () => {
   const { cart, updateQuantity, removeFromCart } = useCart();
+  const { promotions, activePromo } = usePromotions();
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const shipping = subtotal > 5000 ? 0 : 250;
@@ -36,6 +40,9 @@ const Cart = () => {
     <div className="min-h-screen bg-background">
       <Header cartItemCount={cart.length} />
       <div className="container mx-auto px-4 py-8">
+        {/* Cart Promo Banner */}
+        {activePromo && <PromoBanner promotion={activePromo} variant="compact" />}
+
         <h1 className="text-4xl font-bold mb-8">Shopping Cart</h1>
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-4">
@@ -96,6 +103,13 @@ const Cart = () => {
                 <Link to="/shop">
                   <Button variant="outline" className="w-full">Continue Shopping</Button>
                 </Link>
+
+                {/* Cart Promo */}
+                {promotions.length > 0 && (
+                  <div className="mt-4 pt-4 border-t">
+                    <CartPromo promotion={promotions[0]} />
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

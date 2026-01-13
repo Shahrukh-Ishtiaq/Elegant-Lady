@@ -8,6 +8,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ScrollToTop } from "./components/ScrollToTop";
 import { WhatsAppButton } from "./components/WhatsAppButton";
 import { ProtectedAdminRoute } from "./components/ProtectedAdminRoute";
+import { GlobalFloatingPromo } from "./components/promotions/GlobalFloatingPromo";
 import Home from "./pages/Home";
 import Shop from "./pages/Shop";
 import ProductDetail from "./pages/ProductDetail";
@@ -25,6 +26,7 @@ import SizeGuide from "./pages/SizeGuide";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import NotFound from "./pages/NotFound";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -57,6 +59,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
             <WhatsAppButton />
+            <GlobalFloatingPromo />
           </BrowserRouter>
         </TooltipProvider>
       </CartProvider>
