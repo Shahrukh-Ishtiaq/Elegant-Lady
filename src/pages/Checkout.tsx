@@ -153,20 +153,15 @@ const Checkout = () => {
 
       if (error) {
         // Handle specific error messages from the atomic function
-        const errorMsg = error.message || '';
-        
-        if (errorMsg.includes('out of stock')) {
-          toast.error(errorMsg);
-        } else if (errorMsg.includes('not found in our catalog')) {
-          toast.error("Some items in your cart are no longer available. Please refresh and try again.");
-        } else if (errorMsg.includes('units of')) {
-          toast.error(errorMsg);
-        } else if (errorMsg.includes('must be logged in')) {
+        if (error.message.includes('Insufficient stock')) {
+          toast.error(error.message);
+        } else if (error.message.includes('not available')) {
+          toast.error(error.message);
+        } else if (error.message.includes('must be logged in')) {
           toast.error("Please sign in to complete your order");
           navigate("/auth");
         } else {
-          console.error("Order placement error:", error);
-          toast.error("Unable to process your order. Please try again.");
+          throw error;
         }
         setIsSubmitting(false);
         return;
