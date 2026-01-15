@@ -45,12 +45,52 @@ const Checkout = () => {
     zip: "",
   });
 
-  // Update email when user loads
+  const [profileLoaded, setProfileLoaded] = useState(false);
+
+  // Fetch user profile data for auto-fill
   useEffect(() => {
-    if (user?.email) {
-      setFormData(prev => ({ ...prev, email: user.email || "" }));
-    }
-  }, [user?.email]);
+    const fetchProfileData = async () => {
+      if (!user?.id || profileLoaded) return;
+
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error("Error fetching profile:", error);
+          return;
+        }
+
+        if (data) {
+          // Parse full name into first and last name
+          const nameParts = (data.full_name || "").split(" ");
+          const firstName = nameParts[0] || "";
+          const lastName = nameParts.slice(1).join(" ") || "";
+
+          setFormData(prev => ({
+            ...prev,
+            firstName: firstName || prev.firstName,
+            lastName: lastName || prev.lastName,
+            email: data.email || user.email || prev.email,
+            phone: data.phone || prev.phone,
+            address: data.address || prev.address,
+            city: data.city || prev.city,
+          }));
+        } else if (user.email) {
+          setFormData(prev => ({ ...prev, email: user.email || "" }));
+        }
+        
+        setProfileLoaded(true);
+      } catch (error) {
+        console.error("Error:", error);
+      }
+    };
+
+    fetchProfileData();
+  }, [user?.id, user?.email, profileLoaded]);
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const shipping = subtotal > 5000 ? 0 : 250;
@@ -170,6 +210,24 @@ const Checkout = () => {
       const responseData = data as { order_id?: string } | null;
       const orderId = responseData?.order_id;
 
+      // Save/update user profile with shipping details for future orders
+      try {
+        await supabase
+          .from("profiles")
+          .upsert({
+            user_id: user.id,
+            full_name: `${formData.firstName} ${formData.lastName}`.trim(),
+            email: formData.email,
+            phone: formData.phone,
+            address: formData.address,
+            city: formData.city,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'user_id' });
+      } catch (profileError) {
+        console.error("Error saving profile:", profileError);
+        // Don't block order completion for profile save errors
+      }
+
       // Send order confirmation email
       if (orderId) {
         await sendOrderConfirmationEmail(orderId);
@@ -183,7 +241,7 @@ const Checkout = () => {
       clearCart();
       
       setTimeout(() => {
-        navigate("/");
+        navigate("/my-orders");
       }, 2000);
     } catch (error: any) {
       console.error("Order error:", error);

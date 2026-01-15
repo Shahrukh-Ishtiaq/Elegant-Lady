@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Instagram, Facebook, Heart } from "lucide-react";
-import elegantLadyLogo from "@/assets/elegant-lady-logo-gold.png";
+import daisyLogo from "@/assets/daisy-logo.png";
 
 export const Footer = () => {
   return (
@@ -11,19 +11,14 @@ export const Footer = () => {
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <img 
-                src={elegantLadyLogo} 
-                alt="Elegant Lady Logo" 
-                className="h-12 w-12 md:h-16 md:w-16 object-contain"
+                src={daisyLogo} 
+                alt="DAISY Logo" 
+                className="h-16 md:h-20 w-auto object-contain"
               />
-              <div>
-                <h3 className="text-2xl md:text-3xl font-display font-bold text-primary drop-shadow-sm">
-                  DAISY
-                </h3>
-                <p className="text-xs md:text-sm text-muted-foreground italic">
-                  Seamless comfort anytime.
-                </p>
-              </div>
             </div>
+            <p className="text-sm text-muted-foreground max-w-xs">
+              Delicate Details, Distinctive You. Premium lingerie for the modern woman.
+            </p>
             <div className="flex space-x-4 pt-2">
               <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
                 <Instagram className="h-5 w-5" />

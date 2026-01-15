@@ -8,7 +8,9 @@ import {
   LogOut,
   Shield,
   Package,
+  UserCircle,
 } from "lucide-react";
+import daisyLogo from "@/assets/daisy-logo.png";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
@@ -83,13 +85,10 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
                       className="flex flex-col items-center"
                     >
                       <img
-                        src="/ladylogo.png"
-                        alt="Elegant Lady"
-                        className=" w-auto object-contain"
+                        src={daisyLogo}
+                        alt="DAISY"
+                        className="h-16 w-auto object-contain"
                       />
-                      <span className="-mt-20 text-lg font-semibold">
-                        DAISY
-                      </span>
                     </Link>
                   </SheetTitle>
                 </SheetHeader>
@@ -123,6 +122,18 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
                         <p className="text-sm text-muted-foreground">
                           Signed in as {user.email}
                         </p>
+                        <Link
+                          to="/profile"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start mb-2"
+                          >
+                            <UserCircle className="mr-2 h-4 w-4" />
+                            My Profile
+                          </Button>
+                        </Link>
                         <Link
                           to="/my-orders"
                           onClick={() => setMobileMenuOpen(false)}
@@ -158,23 +169,15 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
             </Sheet>
           </div>
 
-          {/* LOGO + TEXT (DESKTOP LEFT, MOBILE CENTER) */}
-          <div className="relative flex items-center h-20 pl-4">
-            {/* BIG OVERLAPPING LOGO */}
-            <Link to="/" className="block">
+          {/* LOGO (DESKTOP LEFT, MOBILE CENTER) */}
+          <div className="relative flex items-center h-20">
+            <Link to="/" className="flex items-center">
               <img
-                src="/ladylogo.png"
-                alt="Elegant Lady"
-                className="
-        h-28 w-auto object-contain
-        absolute -bottom-8 -left-8
-        z-30
-      "
+                src={daisyLogo}
+                alt="DAISY"
+                className="h-14 md:h-16 w-auto object-contain"
               />
             </Link>
-
-            {/* TEXT — aligned beside logo */}
-            <span className="font-semibold text-xl ml-10">DAISY</span>
           </div>
 
           {/* DESKTOP NAVIGATION */}
@@ -233,6 +236,11 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
                 <div className="hidden md:flex items-center gap-1">
                   {user ? (
                     <>
+                      <Link to="/profile">
+                        <Button variant="ghost" size="icon" title="My Profile">
+                          <UserCircle className="h-5 w-5" />
+                        </Button>
+                      </Link>
                       <Link to="/my-orders">
                         <Button variant="ghost" size="icon" title="My Orders">
                           <Package className="h-5 w-5" />
