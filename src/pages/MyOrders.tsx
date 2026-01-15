@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCart } from "@/contexts/CartContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, ArrowLeft, Truck } from "lucide-react";
+import { Package, ArrowLeft, Truck, ShoppingBag, UserCircle, RefreshCw } from "lucide-react";
 import { OrderTrackingTimeline } from "@/components/OrderTrackingTimeline";
+import { toast } from "sonner";
 
 interface OrderItem {
   id: string;
@@ -38,6 +40,7 @@ interface Order {
 
 const MyOrders = () => {
   const { user, loading: authLoading } = useAuth();
+  const { addToCart } = useCart();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,6 +88,29 @@ const MyOrders = () => {
   const openTracking = (order: Order) => {
     setSelectedOrder(order);
     setTrackingOpen(true);
+  };
+
+  const handleReorder = (order: Order) => {
+    order.items.forEach(item => {
+      addToCart({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        category: "",
+        images: [],
+        description: "",
+        sizes: [],
+        colors: [],
+        inStock: true,
+        rating: 0,
+        reviewCount: 0,
+        selectedSize: item.selectedSize || "",
+        selectedColor: item.selectedColor || "",
+        quantity: item.quantity
+      });
+    });
+    toast.success("Items added to cart!");
+    navigate("/cart");
   };
 
   const getStatusColor = (status: string) => {
@@ -171,7 +197,7 @@ const MyOrders = () => {
                         })}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Badge className={getStatusColor(order.status)}>
                         {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                       </Badge>
@@ -182,6 +208,14 @@ const MyOrders = () => {
                       >
                         <Truck className="h-4 w-4 mr-1" />
                         Track
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleReorder(order)}
+                      >
+                        <RefreshCw className="h-4 w-4 mr-1" />
+                        Reorder
                       </Button>
                     </div>
                   </div>
