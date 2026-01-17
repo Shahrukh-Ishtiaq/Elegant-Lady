@@ -7,7 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Package, ShoppingCart, Users, DollarSign, Sparkles, Mail, Bell, MessageSquare, Boxes, Volume2, VolumeX } from "lucide-react";
+import { Loader2, Package, ShoppingCart, Users, DollarSign, Sparkles, Mail, Bell, MessageSquare, Boxes, Volume2, VolumeX, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminProducts } from "@/components/admin/AdminProducts";
 import { AdminOrders } from "@/components/admin/AdminOrders";
@@ -17,6 +17,7 @@ import { AdminPromotions } from "@/components/admin/AdminPromotions";
 import { AdminSubscribers } from "@/components/admin/AdminSubscribers";
 import { AdminMessages } from "@/components/admin/AdminMessages";
 import { AdminInventory } from "@/components/admin/AdminInventory";
+import { AdminSiteSettings } from "@/components/admin/AdminSiteSettings";
 import { toast } from "sonner";
 
 const AdminDashboard = () => {
@@ -476,7 +477,7 @@ const AdminDashboard = () => {
               clearNewOrderBadge();
             }
           }}>
-            <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 max-w-5xl">
+            <TabsList className="grid w-full grid-cols-5 lg:grid-cols-9 max-w-5xl">
               <TabsTrigger value="orders" className="flex items-center gap-1 relative">
                 <ShoppingCart className="h-3 w-3" />
                 <span className="hidden sm:inline">Orders</span>
@@ -511,6 +512,10 @@ const AdminDashboard = () => {
                 <MessageSquare className="h-3 w-3" />
                 <span className="hidden sm:inline">Messages</span>
               </TabsTrigger>
+              <TabsTrigger value="settings" className="flex items-center gap-1">
+                <Settings className="h-3 w-3" />
+                <span className="hidden sm:inline">Settings</span>
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="orders">
@@ -543,6 +548,10 @@ const AdminDashboard = () => {
 
             <TabsContent value="messages">
               <AdminMessages />
+            </TabsContent>
+
+            <TabsContent value="settings">
+              <AdminSiteSettings />
             </TabsContent>
           </Tabs>
         </motion.div>
