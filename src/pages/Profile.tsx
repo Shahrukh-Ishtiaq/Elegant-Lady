@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -23,7 +23,8 @@ import {
   Loader2,
   ArrowLeft,
   Save,
-  Shield
+  Shield,
+  Trash2
 } from "lucide-react";
 import { PasswordInput } from "@/components/PasswordInput";
 
@@ -33,7 +34,7 @@ interface ProfileData {
   phone: string | null;
   address: string | null;
   city: string | null;
-  avatar_url?: string | null;
+  avatar_url: string | null;
 }
 
 const Profile = () => {
@@ -42,6 +43,7 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [profile, setProfile] = useState<ProfileData>({
     full_name: "",
@@ -90,7 +92,7 @@ const Profile = () => {
             phone: data.phone || "",
             address: data.address || "",
             city: data.city || "",
-            avatar_url: null // We'd need to add this column if we want avatar storage
+            avatar_url: data.avatar_url || null
           });
         } else {
           // Use user email if no profile exists
@@ -111,6 +113,80 @@ const Profile = () => {
     }
   }, [user]);
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be less than 5MB");
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `avatar-${Date.now()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(filePath);
+
+      const avatarUrl = data.publicUrl;
+
+      // Update profile with new avatar URL
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .upsert({
+          user_id: user.id,
+          avatar_url: avatarUrl,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+
+      if (updateError) throw updateError;
+
+      setProfile(prev => ({ ...prev, avatar_url: avatarUrl }));
+      toast.success("Profile photo updated!");
+    } catch (error: any) {
+      console.error("Avatar upload error:", error);
+      toast.error("Failed to upload photo: " + (error.message || "Unknown error"));
+    } finally {
+      setUploadingAvatar(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const removeAvatar = async () => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ avatar_url: null, updated_at: new Date().toISOString() })
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+
+      setProfile(prev => ({ ...prev, avatar_url: null }));
+      toast.success("Profile photo removed");
+    } catch (error: any) {
+      console.error("Error removing avatar:", error);
+      toast.error("Failed to remove photo");
+    }
+  };
   const handleSaveProfile = async () => {
     if (!user) return;
     
@@ -239,14 +315,37 @@ const Profile = () => {
                       {getInitials(profile.full_name)}
                     </AvatarFallback>
                   </Avatar>
+                  <Input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarUpload}
+                    className="hidden"
+                    disabled={uploadingAvatar}
+                  />
                   <Button 
                     size="icon" 
                     variant="outline" 
                     className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full"
                     disabled={uploadingAvatar}
+                    onClick={() => fileInputRef.current?.click()}
                   >
-                    <Camera className="h-4 w-4" />
+                    {uploadingAvatar ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Camera className="h-4 w-4" />
+                    )}
                   </Button>
+                  {profile.avatar_url && (
+                    <Button 
+                      size="icon" 
+                      variant="destructive" 
+                      className="absolute -bottom-2 -left-2 h-6 w-6 rounded-full"
+                      onClick={removeAvatar}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
                 </div>
                 <div>
                   <h3 className="font-semibold text-lg">{profile.full_name || "Guest User"}</h3>

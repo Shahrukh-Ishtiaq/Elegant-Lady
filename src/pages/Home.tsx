@@ -35,16 +35,18 @@ interface Product {
   images: string[] | null;
 }
 
-// Hero images for slideshow
-const heroImages = [
-  heroImage,
-];
+interface SiteSettings {
+  hero_image_url: string | null;
+  hero_title: string | null;
+  hero_subtitle: string | null;
+}
 
 const Home = () => {
   const { cart } = useCart();
   const [categories, setCategories] = useState<Category[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
   const [subscribeEmail, setSubscribeEmail] = useState("");
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
@@ -54,34 +56,52 @@ const Home = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      const [categoriesRes, promotionsRes, productsRes] = await Promise.all([
+      const [categoriesRes, promotionsRes, productsRes, settingsRes] = await Promise.all([
         supabase.from('categories').select('*').order('name'),
         supabase.from('promotions').select('*').eq('is_active', true),
-        supabase.from('products').select('id, name, images').eq('is_featured', true).limit(5)
+        supabase.from('products').select('id, name, images').eq('is_featured', true).limit(5),
+        supabase.from('site_settings').select('hero_image_url, hero_title, hero_subtitle').eq('id', 'main').maybeSingle()
       ]);
       
       if (categoriesRes.data) setCategories(categoriesRes.data);
       if (promotionsRes.data) setPromotions(promotionsRes.data);
       if (productsRes.data) setFeaturedProducts(productsRes.data);
+      if (settingsRes.data) setSiteSettings(settingsRes.data);
     };
     fetchData();
   }, []);
 
+  // Build hero images array - prioritize admin-set image
+  const getHeroImages = () => {
+    const images: string[] = [];
+    
+    // Use admin-set hero image first if available
+    if (siteSettings?.hero_image_url) {
+      images.push(siteSettings.hero_image_url);
+    } else {
+      images.push(heroImage);
+    }
+    
+    // Add featured product images
+    featuredProducts.filter(p => p.images?.[0]).forEach(p => {
+      images.push(p.images![0]);
+    });
+    
+    return images;
+  };
+
+  const allHeroImages = getHeroImages();
+
   // Auto-advance hero slideshow with product images
   useEffect(() => {
-    const allImages = [
-      heroImage,
-      ...featuredProducts.filter(p => p.images?.[0]).map(p => p.images![0])
-    ];
-    
-    if (allImages.length <= 1) return;
+    if (allHeroImages.length <= 1) return;
     
     const interval = setInterval(() => {
-      setCurrentHeroIndex(prev => (prev + 1) % allImages.length);
+      setCurrentHeroIndex(prev => (prev + 1) % allHeroImages.length);
     }, 5000);
     
     return () => clearInterval(interval);
-  }, [featuredProducts]);
+  }, [allHeroImages.length]);
 
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,12 +138,6 @@ const Home = () => {
   };
 
   const activePromo = promotions[0];
-
-  // Combine hero image with featured product images for slideshow
-  const allHeroImages = [
-    heroImage,
-    ...featuredProducts.filter(p => p.images?.[0]).map(p => p.images![0])
-  ];
 
   const nextSlide = useCallback(() => {
     setCurrentHeroIndex(prev => (prev + 1) % allHeroImages.length);
@@ -265,14 +279,14 @@ const Home = () => {
                     textShadow: '2px 2px 4px rgba(0,0,0,0.3), 0 0 40px rgba(255,255,255,0.5)' 
                   }}
                 >
-                  Delicate Details
+                  {siteSettings?.hero_title || "Delicate Details"}
                 </span>
                 <br />
                 <span 
                   className="text-foreground font-bold"
                   style={{ textShadow: '1px 1px 3px rgba(0,0,0,0.2)' }}
                 >
-                  Distinctive You.
+                  {siteSettings?.hero_subtitle || "Distinctive You."}
                 </span>
               </motion.h1>
               <motion.p 
