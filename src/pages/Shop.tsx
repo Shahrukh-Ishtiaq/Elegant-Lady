@@ -82,6 +82,7 @@ const Shop = () => {
             *,
             category:categories(name)
           `)
+          .eq('is_frozen', false) // Filter out frozen products
           .order('created_at', { ascending: false }),
         supabase
           .from('categories')

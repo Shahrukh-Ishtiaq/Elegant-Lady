@@ -156,6 +156,7 @@ export type Database = {
           images: string[] | null
           in_stock: boolean | null
           is_featured: boolean | null
+          is_frozen: boolean | null
           is_new: boolean | null
           name: string
           original_price: number | null
@@ -176,6 +177,7 @@ export type Database = {
           images?: string[] | null
           in_stock?: boolean | null
           is_featured?: boolean | null
+          is_frozen?: boolean | null
           is_new?: boolean | null
           name: string
           original_price?: number | null
@@ -196,6 +198,7 @@ export type Database = {
           images?: string[] | null
           in_stock?: boolean | null
           is_featured?: boolean | null
+          is_frozen?: boolean | null
           is_new?: boolean | null
           name?: string
           original_price?: number | null
@@ -365,6 +368,7 @@ export type Database = {
       site_settings: {
         Row: {
           hero_image_url: string | null
+          hero_images: string[] | null
           hero_subtitle: string | null
           hero_title: string | null
           id: string
@@ -373,6 +377,7 @@ export type Database = {
         }
         Insert: {
           hero_image_url?: string | null
+          hero_images?: string[] | null
           hero_subtitle?: string | null
           hero_title?: string | null
           id?: string
@@ -381,6 +386,7 @@ export type Database = {
         }
         Update: {
           hero_image_url?: string | null
+          hero_images?: string[] | null
           hero_subtitle?: string | null
           hero_title?: string | null
           id?: string

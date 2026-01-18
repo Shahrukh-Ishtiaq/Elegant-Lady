@@ -37,6 +37,7 @@ interface Product {
 
 interface SiteSettings {
   hero_image_url: string | null;
+  hero_images: string[] | null;
   hero_title: string | null;
   hero_subtitle: string | null;
 }
@@ -59,33 +60,34 @@ const Home = () => {
       const [categoriesRes, promotionsRes, productsRes, settingsRes] = await Promise.all([
         supabase.from('categories').select('*').order('name'),
         supabase.from('promotions').select('*').eq('is_active', true),
-        supabase.from('products').select('id, name, images').eq('is_featured', true).limit(5),
-        supabase.from('site_settings').select('hero_image_url, hero_title, hero_subtitle').eq('id', 'main').maybeSingle()
+        supabase.from('products').select('id, name, images').eq('is_featured', true).eq('is_frozen', false).limit(5),
+        supabase.from('site_settings').select('hero_image_url, hero_images, hero_title, hero_subtitle').eq('id', 'main').maybeSingle()
       ]);
       
       if (categoriesRes.data) setCategories(categoriesRes.data);
       if (promotionsRes.data) setPromotions(promotionsRes.data);
       if (productsRes.data) setFeaturedProducts(productsRes.data);
-      if (settingsRes.data) setSiteSettings(settingsRes.data);
+      if (settingsRes.data) {
+        setSiteSettings(settingsRes.data as SiteSettings);
+      }
     };
     fetchData();
   }, []);
 
-  // Build hero images array - prioritize admin-set image
+  // Build hero images array - prioritize admin-set images
   const getHeroImages = () => {
     const images: string[] = [];
     
-    // Use admin-set hero image first if available
-    if (siteSettings?.hero_image_url) {
+    // Use admin-set hero images array first if available
+    if (siteSettings?.hero_images && siteSettings.hero_images.length > 0) {
+      images.push(...siteSettings.hero_images);
+    } else if (siteSettings?.hero_image_url) {
+      // Fallback to single hero_image_url
       images.push(siteSettings.hero_image_url);
     } else {
+      // Use default image
       images.push(heroImage);
     }
-    
-    // Add featured product images
-    featuredProducts.filter(p => p.images?.[0]).forEach(p => {
-      images.push(p.images![0]);
-    });
     
     return images;
   };

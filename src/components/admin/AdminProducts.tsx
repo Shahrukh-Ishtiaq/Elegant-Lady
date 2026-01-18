@@ -9,7 +9,7 @@ import { Textarea } from "../ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { Badge } from "../ui/badge";
-import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Snowflake, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { ImageUpload } from "./ImageUpload";
 
@@ -28,6 +28,7 @@ interface Product {
   stock_quantity: number;
   is_featured: boolean;
   is_new: boolean;
+  is_frozen: boolean;
 }
 
 interface Category {
@@ -69,7 +70,7 @@ export const AdminProducts = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setProducts(data || []);
+      setProducts((data || []).map(p => ({ ...p, is_frozen: p.is_frozen ?? false })));
     } catch (error) {
       console.error("Error fetching products:", error);
       toast.error("Failed to load products");
@@ -172,6 +173,27 @@ export const AdminProducts = () => {
     } catch (error) {
       console.error("Error deleting product:", error);
       toast.error("Failed to delete product");
+    }
+  };
+
+  const toggleFreeze = async (product: Product) => {
+    try {
+      const newFrozenStatus = !product.is_frozen;
+      const { error } = await supabase
+        .from("products")
+        .update({ is_frozen: newFrozenStatus })
+        .eq("id", product.id);
+
+      if (error) throw error;
+
+      setProducts(prev =>
+        prev.map(p => p.id === product.id ? { ...p, is_frozen: newFrozenStatus } : p)
+      );
+
+      toast.success(newFrozenStatus ? "Product frozen - hidden from website" : "Product unfrozen - visible on website");
+    } catch (error) {
+      console.error("Error toggling freeze:", error);
+      toast.error("Failed to update product visibility");
     }
   };
 
@@ -382,12 +404,13 @@ export const AdminProducts = () => {
                   <TableHead>Price</TableHead>
                   <TableHead>Stock</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Visibility</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {products.map((product) => (
-                  <TableRow key={product.id}>
+                  <TableRow key={product.id} className={product.is_frozen ? "opacity-60 bg-muted/30" : ""}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         {product.images && product.images[0] && (
@@ -415,7 +438,30 @@ export const AdminProducts = () => {
                       </Badge>
                     </TableCell>
                     <TableCell>
+                      <Badge variant={product.is_frozen ? "secondary" : "outline"} className="gap-1">
+                        {product.is_frozen ? (
+                          <>
+                            <Snowflake className="h-3 w-3" />
+                            Frozen
+                          </>
+                        ) : (
+                          <>
+                            <Sun className="h-3 w-3" />
+                            Visible
+                          </>
+                        )}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
                       <div className="flex gap-2">
+                        <Button
+                          variant={product.is_frozen ? "default" : "outline"}
+                          size="icon"
+                          onClick={() => toggleFreeze(product)}
+                          title={product.is_frozen ? "Unfreeze Product" : "Freeze Product"}
+                        >
+                          {product.is_frozen ? <Sun className="h-4 w-4" /> : <Snowflake className="h-4 w-4" />}
+                        </Button>
                         <Button
                           variant="outline"
                           size="icon"

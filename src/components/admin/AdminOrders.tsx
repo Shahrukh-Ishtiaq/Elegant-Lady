@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Loader2, Bell, Package, Eye, MapPin, Phone, Mail, CreditCard, Calendar, Filter, CalendarDays, Printer } from "lucide-react";
+import { Loader2, Bell, Package, Eye, MapPin, Phone, Mail, CreditCard, Calendar, Filter, CalendarDays, Printer, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { format, isToday, isYesterday, parseISO, startOfDay, endOfDay } from "date-fns";
 import { useRef } from "react";
@@ -67,6 +67,7 @@ export const AdminOrders = () => {
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [customDate, setCustomDate] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     fetchOrders();
@@ -112,9 +113,23 @@ export const AdminOrders = () => {
     };
   }, []);
 
-  // Apply filters whenever orders, dateFilter, customDate, or statusFilter changes
+  // Apply filters whenever orders, dateFilter, customDate, statusFilter, or searchQuery changes
   useEffect(() => {
     let filtered = [...orders];
+
+    // Apply search filter (Order ID, Mobile, Email)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(order => {
+        const orderId = order.id.toLowerCase();
+        const phone = order.shipping_address?.phone?.toLowerCase() || "";
+        const email = order.shipping_address?.email?.toLowerCase() || "";
+        
+        return orderId.includes(query) || 
+               phone.includes(query) || 
+               email.includes(query);
+      });
+    }
 
     // Apply date filter
     if (dateFilter === "today") {
@@ -135,7 +150,7 @@ export const AdminOrders = () => {
     }
 
     setFilteredOrders(filtered);
-  }, [orders, dateFilter, customDate, statusFilter]);
+  }, [orders, dateFilter, customDate, statusFilter, searchQuery]);
 
   const playNotificationSound = () => {
     try {
@@ -413,6 +428,27 @@ export const AdminOrders = () => {
           </div>
         </div>
 
+        {/* Search */}
+        <div className="relative w-full md:w-auto">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by Order ID, Phone, or Email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 pr-9 w-full md:w-80"
+          />
+          {searchQuery && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+              onClick={() => setSearchQuery("")}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+
         {/* Filters */}
         <div className="flex flex-wrap gap-3 items-center">
           <div className="flex items-center gap-2">
@@ -459,7 +495,7 @@ export const AdminOrders = () => {
             </SelectContent>
           </Select>
 
-          {(dateFilter !== "all" || statusFilter !== "all") && (
+          {(dateFilter !== "all" || statusFilter !== "all" || searchQuery) && (
             <Button
               variant="ghost"
               size="sm"
@@ -467,9 +503,10 @@ export const AdminOrders = () => {
                 setDateFilter("all");
                 setStatusFilter("all");
                 setCustomDate("");
+                setSearchQuery("");
               }}
             >
-              Clear Filters
+              Clear All
             </Button>
           )}
         </div>
