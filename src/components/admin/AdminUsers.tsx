@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2, Shield, ShieldOff, Mail, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -15,6 +16,7 @@ interface Profile {
   phone: string | null;
   city: string | null;
   email: string | null;
+  avatar_url: string | null;
   created_at: string;
 }
 
@@ -23,15 +25,9 @@ interface UserRole {
   role: "admin" | "moderator" | "user";
 }
 
-interface AuthUser {
-  id: string;
-  email: string;
-}
-
 export const AdminUsers = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
-  const [userEmails, setUserEmails] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -102,6 +98,16 @@ export const AdminUsers = () => {
     }
   };
 
+  const getInitials = (name: string | null) => {
+    if (!name) return "U";
+    return name
+      .split(" ")
+      .map(n => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center py-8">
@@ -137,13 +143,21 @@ export const AdminUsers = () => {
                   return (
                     <TableRow key={profile.id}>
                       <TableCell>
-                        <div>
-                          <p className="font-medium">
-                            {profile.full_name || "No name"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            ID: {profile.user_id.slice(0, 8)}...
-                          </p>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={profile.avatar_url || undefined} />
+                            <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                              {getInitials(profile.full_name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">
+                              {profile.full_name || "No name"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              ID: {profile.user_id.slice(0, 8)}...
+                            </p>
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>

@@ -32,6 +32,7 @@ interface Product {
   rating: number | null;
   review_count: number | null;
   is_new: boolean | null;
+  is_frozen: boolean | null;
   category?: { id: string; name: string };
 }
 
@@ -61,13 +62,14 @@ const ProductDetail = () => {
       if (data && !error) {
         setProduct(data as Product);
         
-        // Fetch related products
+        // Fetch related products (excluding frozen ones)
         if (data.category?.id) {
           const { data: related } = await supabase
             .from('products')
             .select(`*, category:categories(id, name)`)
             .eq('category_id', data.category.id)
             .neq('id', id)
+            .eq('is_frozen', false)
             .limit(4);
           
           if (related) setRelatedProducts(related as Product[]);
@@ -154,12 +156,13 @@ const ProductDetail = () => {
     );
   }
 
-  if (!product) {
+  if (!product || product.is_frozen) {
     return (
       <div className="min-h-screen bg-background">
         <Header cartItemCount={cart.length} />
         <div className="container mx-auto px-4 py-16 text-center">
-          <h1 className="text-2xl font-bold mb-4">Product not found</h1>
+          <h1 className="text-2xl font-bold mb-4">Product not available</h1>
+          <p className="text-muted-foreground mb-6">This product is currently unavailable.</p>
           <Link to="/shop">
             <Button variant="default">Return to Shop</Button>
           </Link>

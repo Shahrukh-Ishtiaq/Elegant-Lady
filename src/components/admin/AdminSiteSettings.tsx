@@ -5,11 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, X, Loader2, Image as ImageIcon, Save, RefreshCw } from "lucide-react";
+import { Upload, X, Loader2, Image as ImageIcon, Save, RefreshCw, Plus, GripVertical } from "lucide-react";
 
 interface SiteSettings {
   id: string;
   hero_image_url: string | null;
+  hero_images: string[] | null;
   hero_title: string | null;
   hero_subtitle: string | null;
   updated_at: string;
@@ -24,7 +25,7 @@ export const AdminSiteSettings = () => {
 
   const [heroTitle, setHeroTitle] = useState("");
   const [heroSubtitle, setHeroSubtitle] = useState("");
-  const [heroImageUrl, setHeroImageUrl] = useState<string | null>(null);
+  const [heroImages, setHeroImages] = useState<string[]>([]);
 
   useEffect(() => {
     fetchSettings();
@@ -43,10 +44,16 @@ export const AdminSiteSettings = () => {
       }
 
       if (data) {
-        setSettings(data);
+        setSettings(data as SiteSettings);
         setHeroTitle(data.hero_title || "");
         setHeroSubtitle(data.hero_subtitle || "");
-        setHeroImageUrl(data.hero_image_url);
+        // Use hero_images array or fallback to single hero_image_url
+        const images = (data as SiteSettings).hero_images || [];
+        if (images.length === 0 && data.hero_image_url) {
+          setHeroImages([data.hero_image_url]);
+        } else {
+          setHeroImages(images);
+        }
       }
     } catch (error: any) {
       console.error("Error fetching settings:", error);
@@ -57,40 +64,54 @@ export const AdminSiteSettings = () => {
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select an image file");
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("Image must be less than 10MB");
-      return;
-    }
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     setUploading(true);
+    const newImages: string[] = [];
+
     try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `hero-${Date.now()}.${fileExt}`;
-      const filePath = `site/${fileName}`;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        if (!file.type.startsWith("image/")) {
+          toast.error(`${file.name} is not an image file`);
+          continue;
+        }
 
-      const { error: uploadError } = await supabase.storage
-        .from("stock")
-        .upload(filePath, file, { upsert: true });
+        if (file.size > 10 * 1024 * 1024) {
+          toast.error(`${file.name} must be less than 10MB`);
+          continue;
+        }
 
-      if (uploadError) throw uploadError;
+        const fileExt = file.name.split(".").pop();
+        const fileName = `hero-${Date.now()}-${i}.${fileExt}`;
+        const filePath = `hero/${fileName}`;
 
-      const { data } = supabase.storage
-        .from("stock")
-        .getPublicUrl(filePath);
+        const { error: uploadError } = await supabase.storage
+          .from("site_images")
+          .upload(filePath, file, { upsert: true });
 
-      setHeroImageUrl(data.publicUrl);
-      toast.success("Hero image uploaded!");
+        if (uploadError) {
+          console.error("Upload error:", uploadError);
+          toast.error(`Failed to upload ${file.name}: ${uploadError.message}`);
+          continue;
+        }
+
+        const { data } = supabase.storage
+          .from("site_images")
+          .getPublicUrl(filePath);
+
+        newImages.push(data.publicUrl);
+      }
+
+      if (newImages.length > 0) {
+        setHeroImages(prev => [...prev, ...newImages]);
+        toast.success(`${newImages.length} image(s) uploaded!`);
+      }
     } catch (error: any) {
       console.error("Upload error:", error);
-      toast.error("Failed to upload image");
+      toast.error("Failed to upload images");
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
@@ -106,7 +127,8 @@ export const AdminSiteSettings = () => {
         .from("site_settings")
         .upsert({
           id: "main",
-          hero_image_url: heroImageUrl,
+          hero_image_url: heroImages[0] || null, // Keep first image as default
+          hero_images: heroImages,
           hero_title: heroTitle,
           hero_subtitle: heroSubtitle,
           updated_at: new Date().toISOString()
@@ -118,14 +140,24 @@ export const AdminSiteSettings = () => {
       fetchSettings();
     } catch (error: any) {
       console.error("Save error:", error);
-      toast.error("Failed to save settings");
+      toast.error("Failed to save settings: " + (error.message || "Unknown error"));
     } finally {
       setSaving(false);
     }
   };
 
-  const removeHeroImage = () => {
-    setHeroImageUrl(null);
+  const removeHeroImage = (index: number) => {
+    setHeroImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const moveImage = (fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= heroImages.length) return;
+    setHeroImages(prev => {
+      const newImages = [...prev];
+      const [moved] = newImages.splice(fromIndex, 1);
+      newImages.splice(toIndex, 0, moved);
+      return newImages;
+    });
   };
 
   if (loading) {
@@ -145,36 +177,74 @@ export const AdminSiteSettings = () => {
             Hero Section Settings
           </CardTitle>
           <CardDescription>
-            Customize the hero section that appears on the homepage
+            Customize the hero section that appears on the homepage. Upload multiple images for a sliding carousel.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Hero Image Upload */}
+          {/* Hero Images Upload */}
           <div className="space-y-4">
-            <Label>Hero Image</Label>
+            <div className="flex items-center justify-between">
+              <Label>Hero Images ({heroImages.length})</Label>
+              <p className="text-xs text-muted-foreground">
+                {heroImages.length > 1 ? "Multiple images will display as a carousel" : "Add more images for a carousel"}
+              </p>
+            </div>
             
-            {heroImageUrl ? (
-              <div className="relative">
-                <img
-                  src={heroImageUrl}
-                  alt="Hero preview"
-                  className="w-full max-w-2xl h-64 object-cover rounded-lg border"
-                />
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="icon"
-                  className="absolute top-2 right-2"
-                  onClick={removeHeroImage}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+            {heroImages.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {heroImages.map((url, index) => (
+                  <div key={index} className="relative group">
+                    <img
+                      src={url}
+                      alt={`Hero ${index + 1}`}
+                      className="w-full h-32 object-cover rounded-lg border"
+                    />
+                    {index === 0 && (
+                      <span className="absolute top-1 left-1 bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded">
+                        Default
+                      </span>
+                    )}
+                    <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {index > 0 && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => moveImage(index, index - 1)}
+                        >
+                          ↑
+                        </Button>
+                      )}
+                      {index < heroImages.length - 1 && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => moveImage(index, index + 1)}
+                        >
+                          ↓
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => removeHeroImage(index)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="border-2 border-dashed rounded-lg p-8 text-center text-muted-foreground">
                 <ImageIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No hero image set</p>
-                <p className="text-sm">Upload an image to display in the hero section</p>
+                <p>No hero images set</p>
+                <p className="text-sm">Upload images to display in the hero section</p>
               </div>
             )}
 
@@ -183,6 +253,7 @@ export const AdminSiteSettings = () => {
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
+                multiple
                 onChange={handleImageUpload}
                 className="hidden"
                 disabled={uploading}
@@ -200,8 +271,8 @@ export const AdminSiteSettings = () => {
                   </>
                 ) : (
                   <>
-                    <Upload className="mr-2 h-4 w-4" />
-                    {heroImageUrl ? "Change Image" : "Upload Image"}
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Images
                   </>
                 )}
               </Button>
