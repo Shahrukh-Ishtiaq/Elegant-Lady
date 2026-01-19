@@ -367,6 +367,8 @@ export type Database = {
       }
       site_settings: {
         Row: {
+          delivery_charge: number | null
+          free_shipping_threshold: number | null
           hero_image_url: string | null
           hero_images: string[] | null
           hero_subtitle: string | null
@@ -376,6 +378,8 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          delivery_charge?: number | null
+          free_shipping_threshold?: number | null
           hero_image_url?: string | null
           hero_images?: string[] | null
           hero_subtitle?: string | null
@@ -385,6 +389,8 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          delivery_charge?: number | null
+          free_shipping_threshold?: number | null
           hero_image_url?: string | null
           hero_images?: string[] | null
           hero_subtitle?: string | null
