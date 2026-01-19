@@ -13,11 +13,13 @@ export const Footer = () => {
               <img 
                 src={daisyLogo} 
                 alt="DAISY Logo" 
-                className="h-16 md:h-20 w-auto object-contain"
+                className="h-20 md:h-24 w-auto object-contain drop-shadow-md"
               />
             </div>
             <p className="text-sm text-muted-foreground max-w-xs">
-              Delicate Details, Distinctive You. Premium lingerie for the modern woman.
+              <span className="font-semibold text-primary">Delicate Details, Distinctive.</span>
+              <br />
+              Premium lingerie for the modern woman.
             </p>
             <div className="flex space-x-4 pt-2">
               <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
@@ -111,7 +113,7 @@ export const Footer = () => {
 
         <div className="border-t border-border mt-8 pt-8 text-center">
           <p className="text-sm text-muted-foreground">
-            © 2025 <span className="font-semibold text-primary">DAISY</span>. All rights reserved.
+            © 2025 <span className="font-semibold text-primary">DAISY</span>. All rights reserved. | Delicate Details, Distinctive
           </p>
         </div>
       </div>

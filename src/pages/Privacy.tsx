@@ -80,7 +80,7 @@ const Privacy = () => {
                 <li>Opt-out of marketing communications</li>
               </ul>
               <p className="mt-4">
-                To exercise these rights, please contact us at privacy@elegantlady.pk
+                To exercise these rights, please contact us at privacy@daisy.pk
               </p>
             </CardContent>
           </Card>

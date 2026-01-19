@@ -11,16 +11,16 @@ const About = () => {
       
       <div className="container mx-auto px-4 py-16">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-5xl font-bold mb-6 text-center">About Elegant Lady</h1>
+          <h1 className="text-5xl font-bold mb-6 text-center">About DAISY</h1>
           <p className="text-xl text-center text-muted-foreground mb-12">
-            Seamless comfort anytime
+            Delicate Details, Distinctive
           </p>
 
           <div className="space-y-8">
             <section>
               <h2 className="text-3xl font-semibold mb-4">Our Story</h2>
               <p className="text-muted-foreground leading-relaxed">
-                Elegant Lady was born from a simple belief: every woman deserves lingerie that makes her feel 
+                DAISY was born from a simple belief: every woman deserves lingerie that makes her feel 
                 confident, comfortable, and beautiful. We understand that the right undergarments aren't just 
                 about what's underneath—they're about how you feel throughout your entire day.
               </p>
@@ -29,7 +29,7 @@ const About = () => {
             <section>
               <h2 className="text-3xl font-semibold mb-4">Our Mission</h2>
               <p className="text-muted-foreground leading-relaxed">
-                We're dedicated to providing high-quality, comfortable, and elegant lingerie that celebrates 
+                We're dedicated to providing high-quality, comfortable, and stylish lingerie that celebrates 
                 every woman's unique beauty. From everyday essentials to special occasion pieces, we carefully 
                 curate collections that combine style, comfort, and affordability.
               </p>
@@ -39,7 +39,7 @@ const About = () => {
               <h2 className="text-3xl font-semibold mb-4">Quality & Comfort</h2>
               <p className="text-muted-foreground leading-relaxed">
                 Every piece in our collection is selected with care, prioritizing soft fabrics, perfect fit, 
-                and timeless designs. We believe that comfort and elegance should go hand in hand, and our 
+                and timeless designs. We believe that comfort and style should go hand in hand, and our 
                 range of bras, panties, nightwear, and loungewear reflects this philosophy.
               </p>
             </section>

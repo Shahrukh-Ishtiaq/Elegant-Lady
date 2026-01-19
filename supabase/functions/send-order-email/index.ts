@@ -34,7 +34,7 @@ const corsHeaders = {
 };
 
 // Admin email for notifications
-const ADMIN_EMAIL = "admin@daisy.com";
+const ADMIN_EMAIL = "admin@daisy.pk";
 
 interface OrderItem {
   id: string;
@@ -169,7 +169,7 @@ async function sendAdminNotification(
             
             <div style="background-color: #1a1a2e; padding: 20px; text-align: center;">
               <p style="color: #d4a5a5; margin: 0 0 4px; font-size: 16px; letter-spacing: 2px; font-weight: 600;">DAISY</p>
-              <p style="color: #888; margin: 0; font-size: 11px;">Admin Order Notification</p>
+              <p style="color: #888; margin: 0; font-size: 11px;">Delicate Details, Distinctive</p>
             </div>
           </div>
         </body>
@@ -187,6 +187,7 @@ async function sendAdminNotification(
 
 const handler = async (req: Request): Promise<Response> => {
   console.log("send-order-email function called");
+  console.log("Request method:", req.method);
   
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -195,6 +196,8 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     // JWT Authentication - verify the user is authenticated
     const authHeader = req.headers.get('Authorization');
+    console.log("Auth header present:", !!authHeader);
+    
     if (!authHeader?.startsWith('Bearer ')) {
       console.error("Missing or invalid Authorization header");
       return new Response(
@@ -206,6 +209,10 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    
+    console.log("Supabase URL configured:", !!supabaseUrl);
+    console.log("Anon key configured:", !!supabaseAnonKey);
+    console.log("Service key configured:", !!supabaseServiceKey);
     
     // Create client with user's auth token for verification
     const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
@@ -226,6 +233,9 @@ const handler = async (req: Request): Promise<Response> => {
     const userId = userData.user.id;
     console.log("Authenticated user:", userId);
 
+    const requestBody = await req.json();
+    console.log("Request body received:", JSON.stringify(requestBody, null, 2));
+    
     const { 
       orderId, 
       customerEmail, 
@@ -234,11 +244,11 @@ const handler = async (req: Request): Promise<Response> => {
       total, 
       shippingAddress, 
       paymentMethod
-    }: OrderEmailRequest = await req.json();
+    }: OrderEmailRequest = requestBody;
 
     // Input validation
     if (!orderId || typeof orderId !== 'string' || orderId.length < 10) {
-      console.error("Invalid orderId provided");
+      console.error("Invalid orderId provided:", orderId);
       return new Response(
         JSON.stringify({ error: "Invalid order ID" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -246,7 +256,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     if (!customerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
-      console.error("Invalid email provided");
+      console.error("Invalid email provided:", customerEmail);
       return new Response(
         JSON.stringify({ error: "Invalid email address" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -286,7 +296,7 @@ const handler = async (req: Request): Promise<Response> => {
       .single();
 
     if (orderError || !order) {
-      console.error("Order not found:", orderId);
+      console.error("Order not found:", orderId, orderError);
       return new Response(
         JSON.stringify({ error: "Order not found" }),
         { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -303,6 +313,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     console.log("Processing order email for:", customerEmail);
+    console.log("RESEND_API_KEY configured:", !!Deno.env.get("RESEND_API_KEY"));
 
     // Sanitize all user inputs for the customer email
     const safeCustomerName = sanitizeForEmail(customerName);
@@ -343,6 +354,8 @@ const handler = async (req: Request): Promise<Response> => {
     }).join('');
 
     // Send customer confirmation email
+    console.log("Attempting to send email to:", customerEmail);
+    
     const emailResponse = await resend.emails.send({
       from: "DAISY <onboarding@resend.dev>",
       to: [customerEmail],
@@ -358,7 +371,7 @@ const handler = async (req: Request): Promise<Response> => {
           <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
             <div style="background: linear-gradient(135deg, #d4a5a5 0%, #c9a5a5 100%); padding: 40px 20px; text-align: center;">
               <h1 style="color: #ffffff; margin: 0; font-size: 32px; font-weight: 300; letter-spacing: 2px;">DAISY</h1>
-              <p style="color: #ffffff; margin: 8px 0 0; font-size: 14px; opacity: 0.9;">Seamless comfort anytime</p>
+              <p style="color: #ffffff; margin: 8px 0 0; font-size: 14px; opacity: 0.9;">Delicate Details, Distinctive</p>
             </div>
             
             <div style="padding: 40px 30px;">
@@ -406,15 +419,17 @@ const handler = async (req: Request): Promise<Response> => {
               </div>
               
               <div style="background-color: #f9f5f3; padding: 20px; border-radius: 12px; text-align: center;">
-                <p style="margin: 0; color: #666; font-size: 14px;">
-                  Questions about your order? Contact us on WhatsApp!
-                </p>
+                <p style="color: #666; margin: 0 0 8px; font-size: 14px;">Questions about your order?</p>
+                <p style="color: #333; margin: 0; font-weight: 600;">Contact us at support@daisy.pk</p>
               </div>
             </div>
             
-            <div style="background-color: #333; padding: 24px; text-align: center;">
-              <p style="color: #fff; margin: 0 0 8px; font-size: 18px; letter-spacing: 2px;">DAISY</p>
-              <p style="color: #999; margin: 0; font-size: 12px;">© 2024 DAISY. All rights reserved.</p>
+            <div style="background-color: #1a1a2e; padding: 30px 20px; text-align: center;">
+              <p style="color: #d4a5a5; margin: 0 0 8px; font-size: 20px; letter-spacing: 2px; font-weight: 600;">DAISY</p>
+              <p style="color: #888; margin: 0 0 16px; font-size: 12px;">Delicate Details, Distinctive</p>
+              <p style="color: #666; margin: 0; font-size: 11px;">
+                © 2025 DAISY. All rights reserved.
+              </p>
             </div>
           </div>
         </body>
@@ -422,9 +437,9 @@ const handler = async (req: Request): Promise<Response> => {
       `,
     });
 
-    console.log("Customer email sent successfully:", emailResponse);
+    console.log("Customer email response:", JSON.stringify(emailResponse));
 
-    // Send admin notification email - always use server-side configured ADMIN_EMAIL
+    // Also send notification to admin
     try {
       await sendAdminNotification(
         orderId,
@@ -436,20 +451,37 @@ const handler = async (req: Request): Promise<Response> => {
         paymentMethod,
         ADMIN_EMAIL
       );
+      console.log("Admin notification sent successfully");
     } catch (adminError) {
-      console.error("Admin notification failed but customer email sent:", adminError);
-      // Don't fail the whole request if admin email fails
+      // Log but don't fail if admin notification fails
+      console.error("Failed to send admin notification:", adminError);
     }
 
-    return new Response(JSON.stringify({ success: true, emailResponse }), {
-      status: 200,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
+    console.log("Order confirmation email sent successfully");
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: "Order confirmation email sent successfully",
+        emailId: (emailResponse as any)?.id || null
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      }
+    );
   } catch (error: any) {
     console.error("Error in send-order-email function:", error);
+    console.error("Error stack:", error.stack);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      JSON.stringify({ 
+        error: error.message || "Failed to send order confirmation email",
+        details: error.toString()
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      }
     );
   }
 };

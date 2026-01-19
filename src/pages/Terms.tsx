@@ -21,7 +21,7 @@ const Terms = () => {
             </CardHeader>
             <CardContent className="text-muted-foreground">
               <p>
-                By accessing or using Elegant Lady's website and services, you agree to be bound 
+                By accessing or using DAISY's website and services, you agree to be bound 
                 by these Terms of Service. If you do not agree to these terms, please do not use our services.
               </p>
             </CardContent>
@@ -70,7 +70,7 @@ const Terms = () => {
             </CardHeader>
             <CardContent className="text-muted-foreground">
               <p>
-                Elegant Lady shall not be liable for any indirect, incidental, or consequential damages 
+                DAISY shall not be liable for any indirect, incidental, or consequential damages 
                 arising from the use of our products or services. Our liability is limited to the 
                 purchase price of the products ordered.
               </p>
@@ -79,7 +79,7 @@ const Terms = () => {
 
           <div className="text-center text-muted-foreground text-sm">
             <p>Last updated: January 2025</p>
-            <p className="mt-2">For questions, contact us at support@elegantlady.pk</p>
+            <p className="mt-2">For questions, contact us at support@daisy.pk</p>
           </div>
         </div>
       </div>
