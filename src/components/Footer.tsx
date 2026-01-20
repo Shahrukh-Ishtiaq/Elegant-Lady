@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
-import { Instagram, Facebook, Heart } from "lucide-react";
+import { Instagram, Facebook, Heart, ExternalLink } from "lucide-react";
 import daisyLogo from "@/assets/daisy-logo.png";
+import nexoraLogo from "@/assets/nexora-logo.png";
 
 export const Footer = () => {
   return (
@@ -13,7 +14,7 @@ export const Footer = () => {
               <img 
                 src={daisyLogo} 
                 alt="DAISY Logo" 
-                className="h-20 md:h-24 w-auto object-contain drop-shadow-md"
+                className="h-28 md:h-32 w-auto object-contain drop-shadow-lg"
               />
             </div>
             <p className="text-sm text-muted-foreground max-w-xs">
@@ -111,10 +112,29 @@ export const Footer = () => {
           </div>
         </div>
 
-        <div className="border-t border-border mt-8 pt-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            © 2025 <span className="font-semibold text-primary">DAISY</span>. All rights reserved. | Delicate Details, Distinctive
-          </p>
+        <div className="border-t border-border mt-8 pt-8">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground text-center md:text-left">
+              © 2025 <span className="font-semibold text-primary">DAISY</span>. All rights reserved. | Delicate Details, Distinctive
+            </p>
+            
+            {/* Powered by Nexora Studio */}
+            <a 
+              href="https://nexora-studio-web.vercel.app" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors group"
+            >
+              <span>Powered by</span>
+              <img 
+                src={nexoraLogo} 
+                alt="Nexora Studio" 
+                className="h-6 w-6 object-contain"
+              />
+              <span className="font-medium">Nexora Studio</span>
+              <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </a>
+          </div>
         </div>
       </div>
     </footer>

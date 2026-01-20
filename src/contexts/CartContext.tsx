@@ -59,6 +59,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             in_stock,
             rating,
             review_count,
+            is_frozen,
             categories (name)
           )
         `)
@@ -67,23 +68,46 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       if (error) throw error;
 
       if (data) {
-        const cartItems: CartItem[] = data.map((item: any) => ({
-          id: item.product_id,
-          name: item.products?.name || '',
-          price: item.products?.price || 0,
-          category: item.products?.categories?.name || '',
-          description: item.products?.description || '',
-          images: item.products?.images || [],
-          sizes: item.products?.sizes || [],
-          colors: item.products?.colors || [],
-          inStock: item.products?.in_stock ?? true,
-          rating: item.products?.rating || 0,
-          reviewCount: item.products?.review_count || 0,
-          quantity: item.quantity,
-          selectedSize: item.selected_size || '',
-          selectedColor: item.selected_color || '',
-        }));
-        setCart(cartItems);
+        // Filter out frozen products and remove them from cart
+        const frozenProductIds: string[] = [];
+        const validCartItems: CartItem[] = [];
+
+        for (const item of data as any[]) {
+          // Check if product is frozen or doesn't exist
+          if (!item.products || item.products.is_frozen === true) {
+            frozenProductIds.push(item.product_id);
+          } else {
+            validCartItems.push({
+              id: item.product_id,
+              name: item.products?.name || '',
+              price: item.products?.price || 0,
+              category: item.products?.categories?.name || '',
+              description: item.products?.description || '',
+              images: item.products?.images || [],
+              sizes: item.products?.sizes || [],
+              colors: item.products?.colors || [],
+              inStock: item.products?.in_stock ?? true,
+              rating: item.products?.rating || 0,
+              reviewCount: item.products?.review_count || 0,
+              quantity: item.quantity,
+              selectedSize: item.selected_size || '',
+              selectedColor: item.selected_color || '',
+            });
+          }
+        }
+
+        // Remove frozen products from cart in database
+        if (frozenProductIds.length > 0) {
+          await supabase
+            .from('cart_items')
+            .delete()
+            .eq('user_id', user.id)
+            .in('product_id', frozenProductIds);
+          
+          toast.info(`${frozenProductIds.length} unavailable item(s) removed from cart`);
+        }
+
+        setCart(validCartItems);
       }
     } catch (error) {
       console.error('Error loading cart:', error);
@@ -97,13 +121,37 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     try {
       const { data, error } = await supabase
         .from('wishlist')
-        .select('product_id')
+        .select(`
+          product_id,
+          products (is_frozen)
+        `)
         .eq('user_id', user.id);
 
       if (error) throw error;
 
       if (data) {
-        setWishlist(data.map((item) => item.product_id));
+        // Filter out frozen products and remove them from wishlist
+        const frozenProductIds: string[] = [];
+        const validWishlistIds: string[] = [];
+
+        for (const item of data as any[]) {
+          if (item.products?.is_frozen === true) {
+            frozenProductIds.push(item.product_id);
+          } else {
+            validWishlistIds.push(item.product_id);
+          }
+        }
+
+        // Remove frozen products from wishlist in database
+        if (frozenProductIds.length > 0) {
+          await supabase
+            .from('wishlist')
+            .delete()
+            .eq('user_id', user.id)
+            .in('product_id', frozenProductIds);
+        }
+
+        setWishlist(validWishlistIds);
       }
     } catch (error) {
       console.error('Error loading wishlist:', error);
@@ -111,15 +159,21 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addToCart = async (item: CartItem) => {
-    // First check real-time stock availability
+    // First check if product is frozen
     try {
-      const { data: product, error: stockError } = await supabase
+      const { data: product, error: productError } = await supabase
         .from('products')
-        .select('stock_quantity, in_stock')
+        .select('stock_quantity, in_stock, is_frozen')
         .eq('id', item.id)
         .single();
       
-      if (stockError) throw stockError;
+      if (productError) throw productError;
+      
+      // Check if product is frozen
+      if (product?.is_frozen === true) {
+        toast.error("This product is currently unavailable");
+        return;
+      }
       
       const currentStock = product?.stock_quantity || 0;
       const isInStock = product?.in_stock !== false;
@@ -273,6 +327,22 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
   const toggleWishlist = async (productId: string) => {
     if (user) {
+      // First check if product is frozen
+      try {
+        const { data: product } = await supabase
+          .from('products')
+          .select('is_frozen')
+          .eq('id', productId)
+          .single();
+
+        if (product?.is_frozen === true) {
+          toast.error("This product is currently unavailable");
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking product:', error);
+      }
+
       const isCurrentlyInWishlist = wishlist.includes(productId);
       
       try {
