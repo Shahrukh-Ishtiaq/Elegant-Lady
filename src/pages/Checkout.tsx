@@ -27,12 +27,18 @@ const checkoutSchema = z.object({
   zip: z.string().min(3, "Postal code is required").max(20, "Postal code too long"),
 });
 
+interface SiteSettings {
+  delivery_charge: number;
+  free_shipping_threshold: number;
+}
+
 const Checkout = () => {
   const navigate = useNavigate();
   const { cart, clearCart } = useCart();
   const { user, loading: authLoading } = useAuth();
   const [paymentMethod, setPaymentMethod] = useState("cod");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>({ delivery_charge: 250, free_shipping_threshold: 5000 });
   
   const [formData, setFormData] = useState({
     firstName: "",
@@ -46,6 +52,30 @@ const Checkout = () => {
   });
 
   const [profileLoaded, setProfileLoaded] = useState(false);
+
+  // Fetch site settings for delivery charges
+  useEffect(() => {
+    const fetchSiteSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("site_settings")
+          .select("delivery_charge, free_shipping_threshold")
+          .eq("id", "main")
+          .single();
+
+        if (!error && data) {
+          setSiteSettings({
+            delivery_charge: data.delivery_charge ?? 250,
+            free_shipping_threshold: data.free_shipping_threshold ?? 5000,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching site settings:", error);
+      }
+    };
+
+    fetchSiteSettings();
+  }, []);
 
   // Fetch user profile data for auto-fill
   useEffect(() => {
@@ -93,7 +123,7 @@ const Checkout = () => {
   }, [user?.id, user?.email, profileLoaded]);
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const shipping = subtotal > 5000 ? 0 : 250;
+  const shipping = subtotal >= siteSettings.free_shipping_threshold ? 0 : siteSettings.delivery_charge;
   const total = subtotal + shipping;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -117,6 +147,8 @@ const Checkout = () => {
             selectedColor: item.selectedColor,
             image: item.images?.[0],
           })),
+          subtotal,
+          shipping,
           total,
           shippingAddress: formData,
           paymentMethod,
@@ -492,11 +524,16 @@ const Checkout = () => {
                     <span>PKR {subtotal.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Shipping</span>
+                    <span className="text-muted-foreground">Delivery</span>
                     <span className={shipping === 0 ? "text-green-600" : ""}>
-                      {shipping === 0 ? "Free" : `PKR ${shipping}`}
+                      {shipping === 0 ? "Free" : `PKR ${shipping.toLocaleString()}`}
                     </span>
                   </div>
+                  {subtotal < siteSettings.free_shipping_threshold && (
+                    <p className="text-xs text-muted-foreground">
+                      Add PKR {(siteSettings.free_shipping_threshold - subtotal).toLocaleString()} more for free shipping!
+                    </p>
+                  )}
                 </div>
 
                 <div className="border-t pt-4">

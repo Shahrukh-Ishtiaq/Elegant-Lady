@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, X, Loader2, Image as ImageIcon, Save, RefreshCw, Plus, GripVertical } from "lucide-react";
+import { Upload, X, Loader2, Image as ImageIcon, Save, RefreshCw, Plus, Truck } from "lucide-react";
 
 interface SiteSettings {
   id: string;
@@ -13,6 +13,8 @@ interface SiteSettings {
   hero_images: string[] | null;
   hero_title: string | null;
   hero_subtitle: string | null;
+  delivery_charge: number | null;
+  free_shipping_threshold: number | null;
   updated_at: string;
 }
 
@@ -26,6 +28,8 @@ export const AdminSiteSettings = () => {
   const [heroTitle, setHeroTitle] = useState("");
   const [heroSubtitle, setHeroSubtitle] = useState("");
   const [heroImages, setHeroImages] = useState<string[]>([]);
+  const [deliveryCharge, setDeliveryCharge] = useState<number>(250);
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState<number>(5000);
 
   useEffect(() => {
     fetchSettings();
@@ -47,6 +51,8 @@ export const AdminSiteSettings = () => {
         setSettings(data as SiteSettings);
         setHeroTitle(data.hero_title || "");
         setHeroSubtitle(data.hero_subtitle || "");
+        setDeliveryCharge(data.delivery_charge ?? 250);
+        setFreeShippingThreshold(data.free_shipping_threshold ?? 5000);
         // Use hero_images array or fallback to single hero_image_url
         const images = (data as SiteSettings).hero_images || [];
         if (images.length === 0 && data.hero_image_url) {
@@ -131,6 +137,8 @@ export const AdminSiteSettings = () => {
           hero_images: heroImages,
           hero_title: heroTitle,
           hero_subtitle: heroSubtitle,
+          delivery_charge: deliveryCharge,
+          free_shipping_threshold: freeShippingThreshold,
           updated_at: new Date().toISOString()
         }, { onConflict: "id" });
 
@@ -170,6 +178,59 @@ export const AdminSiteSettings = () => {
 
   return (
     <div className="space-y-6">
+      {/* Delivery Charge Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Truck className="h-5 w-5" />
+            Delivery & Shipping Settings
+          </CardTitle>
+          <CardDescription>
+            Configure delivery charges and free shipping threshold for orders.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="deliveryCharge">Delivery Charge (PKR)</Label>
+              <Input
+                id="deliveryCharge"
+                type="number"
+                min="0"
+                value={deliveryCharge}
+                onChange={(e) => setDeliveryCharge(Number(e.target.value))}
+                placeholder="250"
+              />
+              <p className="text-xs text-muted-foreground">
+                This amount will be charged for orders below the free shipping threshold.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="freeShippingThreshold">Free Shipping Threshold (PKR)</Label>
+              <Input
+                id="freeShippingThreshold"
+                type="number"
+                min="0"
+                value={freeShippingThreshold}
+                onChange={(e) => setFreeShippingThreshold(Number(e.target.value))}
+                placeholder="5000"
+              />
+              <p className="text-xs text-muted-foreground">
+                Orders above this amount qualify for free shipping.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-muted/50 p-4 rounded-lg">
+            <p className="text-sm text-muted-foreground">
+              <strong>Current Policy:</strong> Orders below PKR {freeShippingThreshold.toLocaleString()} will be charged PKR {deliveryCharge.toLocaleString()} for delivery. Orders of PKR {freeShippingThreshold.toLocaleString()} or more get free shipping.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Hero Section Settings */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -300,28 +361,29 @@ export const AdminSiteSettings = () => {
               placeholder="Enter hero subtitle"
             />
           </div>
-
-          <div className="flex gap-2 pt-4">
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
-                </>
-              )}
-            </Button>
-            <Button variant="outline" onClick={fetchSettings}>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Refresh
-            </Button>
-          </div>
         </CardContent>
       </Card>
+
+      {/* Save Button */}
+      <div className="flex gap-2">
+        <Button onClick={handleSave} disabled={saving} size="lg">
+          {saving ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="mr-2 h-4 w-4" />
+              Save All Settings
+            </>
+          )}
+        </Button>
+        <Button variant="outline" onClick={fetchSettings} size="lg">
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Refresh
+        </Button>
+      </div>
     </div>
   );
 };

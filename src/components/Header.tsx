@@ -67,7 +67,7 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
   return (
     <header className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-24">
+        <div className="flex items-center justify-between h-28">
           {/* MOBILE MENU BUTTON */}
           <div className="md:hidden">
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
@@ -87,9 +87,8 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
                       <img
                         src={daisyLogo}
                         alt="DAISY"
-                        className="h-20 w-auto object-contain"
+                        className="h-28 w-auto object-contain drop-shadow-lg"
                       />
-                      <span className="text-xs text-muted-foreground mt-1">Delicate Details, Distinctive</span>
                     </Link>
                   </SheetTitle>
                 </SheetHeader>
@@ -170,15 +169,14 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
             </Sheet>
           </div>
 
-          {/* LOGO (DESKTOP LEFT, MOBILE CENTER) - LARGER SIZE */}
-          <div className="relative flex items-center h-24">
-            <Link to="/" className="flex flex-col items-center">
+          {/* LOGO - LARGER SIZE */}
+          <div className="relative flex items-center h-28">
+            <Link to="/" className="flex items-center">
               <img
                 src={daisyLogo}
                 alt="DAISY"
-                className="h-16 md:h-20 w-auto object-contain drop-shadow-md"
+                className="h-24 md:h-28 w-auto object-contain drop-shadow-lg hover:scale-105 transition-transform duration-300"
               />
-              <span className="hidden md:block text-[10px] text-muted-foreground tracking-wide">Delicate Details, Distinctive</span>
             </Link>
           </div>
 

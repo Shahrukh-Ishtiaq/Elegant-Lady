@@ -33,7 +33,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Admin email for notifications
+// Admin email for notifications - use a verified domain email
 const ADMIN_EMAIL = "admin@daisy.pk";
 
 interface OrderItem {
@@ -62,6 +62,8 @@ interface OrderEmailRequest {
   customerEmail: string;
   customerName: string;
   items: OrderItem[];
+  subtotal?: number;
+  shipping?: number;
   total: number;
   shippingAddress: ShippingAddress;
   paymentMethod: string;
@@ -72,6 +74,8 @@ async function sendAdminNotification(
   customerName: string,
   customerEmail: string,
   items: OrderItem[],
+  subtotal: number,
+  shipping: number,
   total: number,
   shippingAddress: ShippingAddress,
   paymentMethod: string,
@@ -83,6 +87,8 @@ async function sendAdminNotification(
   const safeCustomerName = sanitizeForEmail(customerName);
   const safeCustomerEmail = sanitizeForEmail(customerEmail);
   const safeOrderId = sanitizeForEmail(orderId);
+  const safeSubtotal = sanitizeNumber(subtotal);
+  const safeShipping = sanitizeNumber(shipping);
   const safeTotal = sanitizeNumber(total);
   const safePaymentMethod = sanitizeForEmail(paymentMethod);
   
@@ -145,6 +151,15 @@ async function sendAdminNotification(
                 <p style="margin: 0; line-height: 1.8; color: #555;">${itemsList}</p>
               </div>
               
+              <div style="margin-bottom: 24px; background-color: #f9f5f3; padding: 16px; border-radius: 8px;">
+                <h3 style="color: #333; margin: 0 0 12px; font-size: 16px;">💰 Order Summary</h3>
+                <p style="margin: 0; line-height: 1.8; color: #555;">
+                  <strong>Subtotal:</strong> PKR ${safeSubtotal.toLocaleString()}<br>
+                  <strong>Delivery:</strong> ${safeShipping === 0 ? 'Free' : `PKR ${safeShipping.toLocaleString()}`}<br>
+                  <strong style="font-size: 18px; color: #1a1a2e;">Total: PKR ${safeTotal.toLocaleString()}</strong>
+                </p>
+              </div>
+              
               <div style="margin-bottom: 24px;">
                 <h3 style="color: #333; margin: 0 0 12px; font-size: 16px; border-bottom: 2px solid #d4a5a5; padding-bottom: 8px;">📍 Shipping Address</h3>
                 <p style="margin: 0; line-height: 1.6; color: #555;">
@@ -186,7 +201,7 @@ async function sendAdminNotification(
 }
 
 const handler = async (req: Request): Promise<Response> => {
-  console.log("send-order-email function called");
+  console.log("send-order-email function called at:", new Date().toISOString());
   console.log("Request method:", req.method);
   
   if (req.method === "OPTIONS") {
@@ -209,10 +224,20 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const resendApiKey = Deno.env.get("RESEND_API_KEY");
     
     console.log("Supabase URL configured:", !!supabaseUrl);
     console.log("Anon key configured:", !!supabaseAnonKey);
     console.log("Service key configured:", !!supabaseServiceKey);
+    console.log("RESEND_API_KEY configured:", !!resendApiKey);
+    
+    if (!resendApiKey) {
+      console.error("RESEND_API_KEY is not configured");
+      return new Response(
+        JSON.stringify({ error: "Email service not configured" }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
     
     // Create client with user's auth token for verification
     const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
@@ -234,13 +259,15 @@ const handler = async (req: Request): Promise<Response> => {
     console.log("Authenticated user:", userId);
 
     const requestBody = await req.json();
-    console.log("Request body received:", JSON.stringify(requestBody, null, 2));
+    console.log("Request body received for order:", requestBody.orderId);
     
     const { 
       orderId, 
       customerEmail, 
       customerName, 
       items, 
+      subtotal = 0,
+      shipping = 0,
       total, 
       shippingAddress, 
       paymentMethod
@@ -313,11 +340,12 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     console.log("Processing order email for:", customerEmail);
-    console.log("RESEND_API_KEY configured:", !!Deno.env.get("RESEND_API_KEY"));
 
     // Sanitize all user inputs for the customer email
     const safeCustomerName = sanitizeForEmail(customerName);
     const safeOrderId = sanitizeForEmail(orderId);
+    const safeSubtotal = sanitizeNumber(subtotal);
+    const safeShipping = sanitizeNumber(shipping);
     const safeTotal = sanitizeNumber(total);
     const safePaymentMethod = sanitizeForEmail(paymentMethod);
     
@@ -397,6 +425,14 @@ const handler = async (req: Request): Promise<Response> => {
                 <tbody>${itemsHtml}</tbody>
                 <tfoot>
                   <tr>
+                    <td colspan="2" style="padding: 12px; text-align: right; color: #666;">Subtotal</td>
+                    <td style="padding: 12px; text-align: right; font-weight: 600;">PKR ${safeSubtotal.toLocaleString()}</td>
+                  </tr>
+                  <tr>
+                    <td colspan="2" style="padding: 12px; text-align: right; color: #666;">Delivery</td>
+                    <td style="padding: 12px; text-align: right; font-weight: 600; ${safeShipping === 0 ? 'color: #22c55e;' : ''}">${safeShipping === 0 ? 'Free' : `PKR ${safeShipping.toLocaleString()}`}</td>
+                  </tr>
+                  <tr style="background-color: #f9f5f3;">
                     <td colspan="2" style="padding: 16px 12px; text-align: right; font-weight: 600; font-size: 18px; color: #333;">Total</td>
                     <td style="padding: 16px 12px; text-align: right; font-weight: 700; font-size: 20px; color: #d4a5a5;">PKR ${safeTotal.toLocaleString()}</td>
                   </tr>
@@ -446,6 +482,8 @@ const handler = async (req: Request): Promise<Response> => {
         customerName,
         customerEmail,
         items,
+        subtotal,
+        shipping,
         total,
         shippingAddress,
         paymentMethod,
