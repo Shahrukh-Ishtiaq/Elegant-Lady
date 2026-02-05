@@ -33,8 +33,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Admin email for notifications - use a verified domain email
-const ADMIN_EMAIL = "admin@daisy.pk";
+// Admin email for notifications - use verified email or the customer's email for testing
+const ADMIN_EMAIL = "infodaisy221@gmail.com";
 
 interface OrderItem {
   id: string;
@@ -112,9 +112,11 @@ async function sendAdminNotification(
   }).join('<br>');
 
   try {
+    console.log("Sending admin notification email to:", adminEmail);
     const response = await resend.emails.send({
       from: "DAISY Orders <onboarding@resend.dev>",
       to: [adminEmail],
+      reply_to: customerEmail,
       subject: `🛒 New Order #${safeOrderId.slice(0, 8).toUpperCase()} - PKR ${safeTotal.toLocaleString()}`,
       html: `
         <!DOCTYPE html>
@@ -382,12 +384,16 @@ const handler = async (req: Request): Promise<Response> => {
     }).join('');
 
     // Send customer confirmation email
-    console.log("Attempting to send email to:", customerEmail);
+    console.log("Attempting to send customer email to:", customerEmail);
+    console.log("Email payload prepared, sending...");
     
-    const emailResponse = await resend.emails.send({
-      from: "DAISY <onboarding@resend.dev>",
-      to: [customerEmail],
-      subject: `Order Confirmed - #${safeOrderId.slice(0, 8).toUpperCase()}`,
+    let emailResponse;
+    try {
+      emailResponse = await resend.emails.send({
+        from: "DAISY <onboarding@resend.dev>",
+        to: [customerEmail],
+        reply_to: "infodaisy221@gmail.com",
+        subject: `Order Confirmed - #${safeOrderId.slice(0, 8).toUpperCase()}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -471,7 +477,13 @@ const handler = async (req: Request): Promise<Response> => {
         </body>
         </html>
       `,
-    });
+      });
+      console.log("Customer email sent successfully:", JSON.stringify(emailResponse));
+    } catch (emailError: any) {
+      console.error("Failed to send customer email:", emailError);
+      console.error("Email error details:", JSON.stringify(emailError));
+      // Continue to try admin notification even if customer email fails
+    }
 
     console.log("Customer email response:", JSON.stringify(emailResponse));
 

@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_allowlist: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          email: string
+          enabled: boolean
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          email: string
+          enabled?: boolean
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          enabled?: boolean
+        }
+        Relationships: []
+      }
       cart_items: {
         Row: {
           created_at: string

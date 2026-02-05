@@ -31,7 +31,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Defer role check and profile update to avoid deadlock
         if (session?.user) {
           setTimeout(() => {
-            checkAdminRole(session.user.id);
+            checkAdminRole(session.user.id, session.user.email);
             // Ensure email and phone are saved to profile for admin display
             ensureProfileData(
               session.user.id, 
@@ -55,7 +55,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        checkAdminRole(session.user.id);
+        checkAdminRole(session.user.id, session.user.email);
         ensureProfileData(
           session.user.id, 
           session.user.email, 
@@ -69,8 +69,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const checkAdminRole = async (userId: string) => {
+  const checkAdminRole = async (userId: string, userEmail?: string) => {
     try {
+      // First check if this email is in the admin allowlist
+      if (userEmail) {
+        const { data: allowlistEntry } = await supabase
+          .from('admin_allowlist')
+          .select('enabled')
+          .eq('email', userEmail.toLowerCase())
+          .eq('enabled', true)
+          .maybeSingle();
+        
+        // If email is in allowlist, ensure they have admin role
+        if (allowlistEntry) {
+          // Check if already has admin role
+          const { data: existingRole } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', userId)
+            .eq('role', 'admin')
+            .maybeSingle();
+          
+          if (!existingRole) {
+            // Grant admin role
+            const { data: userRoleEntry } = await supabase
+              .from('user_roles')
+              .select('id')
+              .eq('user_id', userId)
+              .maybeSingle();
+
+            if (userRoleEntry) {
+              await supabase
+                .from('user_roles')
+                .update({ role: 'admin' })
+                .eq('user_id', userId);
+            } else {
+              await supabase
+                .from('user_roles')
+                .insert({ user_id: userId, role: 'admin' });
+            }
+          }
+          setIsAdmin(true);
+          return;
+        }
+      }
+
+      // Normal admin role check
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
