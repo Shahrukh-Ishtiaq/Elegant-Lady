@@ -133,12 +133,32 @@ const Checkout = () => {
 
   const sendOrderConfirmationEmail = async (orderId: string) => {
     try {
-      const { error } = await supabase.functions.invoke('send-order-email', {
+      // Ensure we always send a real JWT (avoids "AuthSessionMissingError" on the backend)
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        console.error("Failed to read session for email:", sessionError);
+        return;
+      }
+
+      const accessToken = session?.access_token;
+      if (!accessToken) {
+        console.error("No access token found — user is not authenticated");
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke("send-order-email", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
         body: {
           orderId,
           customerEmail: formData.email,
           customerName: `${formData.firstName} ${formData.lastName}`,
-          items: cart.map(item => ({
+          items: cart.map((item) => ({
             id: item.id,
             name: item.name,
             price: item.price,
@@ -158,7 +178,7 @@ const Checkout = () => {
       if (error) {
         console.error("Error sending email:", error);
       } else {
-        console.log("Order confirmation email sent");
+        console.log("Order confirmation email sent", data);
       }
     } catch (error) {
       console.error("Failed to send confirmation email:", error);
