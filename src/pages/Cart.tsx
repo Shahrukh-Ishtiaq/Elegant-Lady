@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -8,13 +9,47 @@ import { useCart } from "@/contexts/CartContext";
 import { usePromotions } from "@/hooks/usePromotions";
 import { CartPromo } from "@/components/promotions/CartPromo";
 import { PromoBanner } from "@/components/promotions/PromoBanner";
+import { supabase } from "@/integrations/supabase/client";
+
+interface SiteSettings {
+  delivery_charge: number;
+  free_shipping_threshold: number;
+}
 
 const Cart = () => {
   const { cart, updateQuantity, removeFromCart } = useCart();
   const { promotions, activePromo } = usePromotions();
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>({ 
+    delivery_charge: 250, 
+    free_shipping_threshold: 5000 
+  });
+
+  // Fetch site settings for delivery charges
+  useEffect(() => {
+    const fetchSiteSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("site_settings")
+          .select("delivery_charge, free_shipping_threshold")
+          .eq("id", "main")
+          .single();
+
+        if (!error && data) {
+          setSiteSettings({
+            delivery_charge: data.delivery_charge ?? 250,
+            free_shipping_threshold: data.free_shipping_threshold ?? 5000,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching site settings:", error);
+      }
+    };
+
+    fetchSiteSettings();
+  }, []);
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const shipping = subtotal > 5000 ? 0 : 250;
+  const shipping = subtotal >= siteSettings.free_shipping_threshold ? 0 : siteSettings.delivery_charge;
   const total = subtotal + shipping;
 
   if (cart.length === 0) {
