@@ -243,21 +243,23 @@ const handler = async (req: Request): Promise<Response> => {
     
     // Create client with user's auth token for verification
     const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false },
     });
 
-    // Verify the JWT token by getting user
-    const { data: userData, error: userError } = await supabaseAuth.auth.getUser();
-    
-    if (userError || !userData?.user) {
-      console.error("JWT verification failed:", userError);
+    // Verify JWT in Edge Functions using claims (no session storage available)
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+
+    if (claimsError || !claimsData?.claims) {
+      console.error("JWT verification failed:", claimsError);
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
-    const userId = userData.user.id;
+    const userId = claimsData.claims.sub;
     console.log("Authenticated user:", userId);
 
     const requestBody = await req.json();
