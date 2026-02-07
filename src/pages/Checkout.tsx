@@ -177,9 +177,18 @@ const Checkout = () => {
 
       if (error) {
         console.error("Error sending email:", error);
-      } else {
-        console.log("Order confirmation email sent", data);
+        toast.error("Order confirmation email send nahi hui — please spam/junk bhi check karein.");
+        return;
       }
+
+      // Function can return {success:false,...} for Resend failures
+      if ((data as any)?.success === false) {
+        console.error("Email function reported failure:", data);
+        toast.error("Order confirmation email send nahi hui (backend). Admin please config check kare.");
+        return;
+      }
+
+      console.log("Order confirmation email sent", data);
     } catch (error) {
       console.error("Failed to send confirmation email:", error);
     }
