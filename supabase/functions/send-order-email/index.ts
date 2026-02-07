@@ -113,11 +113,17 @@ async function sendAdminNotification(
 
   try {
     console.log("Sending admin notification email to:", adminEmail);
-    const response = await resend.emails.send({
+
+    const { data, error } = await resend.emails.send({
       from: "DAISY Orders <onboarding@resend.dev>",
       to: [adminEmail],
       reply_to: customerEmail,
       subject: `🛒 New Order #${safeOrderId.slice(0, 8).toUpperCase()} - PKR ${safeTotal.toLocaleString()}`,
+      text: [
+        `New order #${safeOrderId.slice(0, 8).toUpperCase()}`,
+        `Customer: ${safeCustomerName} (${safeCustomerEmail})`,
+        `Total: PKR ${safeTotal.toLocaleString()}`,
+      ].join("\n"),
       html: `
         <!DOCTYPE html>
         <html>
@@ -193,9 +199,14 @@ async function sendAdminNotification(
         </html>
       `,
     });
-    
-    console.log("Admin notification sent:", response);
-    return response;
+
+    if (error) {
+      console.error("Admin notification failed:", JSON.stringify(error));
+      throw new Error(`Admin email failed: ${error.message || 'Unknown Resend error'}`);
+    }
+
+    console.log("Admin notification sent:", JSON.stringify(data));
+    return data;
   } catch (error) {
     console.error("Error sending admin notification:", error);
     throw error;
@@ -389,98 +400,110 @@ const handler = async (req: Request): Promise<Response> => {
     console.log("Attempting to send customer email to:", customerEmail);
     console.log("Email payload prepared, sending...");
     
-    let emailResponse;
+    let emailResponse: any = null;
     try {
-      emailResponse = await resend.emails.send({
+      const { data, error } = await resend.emails.send({
         from: "DAISY <onboarding@resend.dev>",
         to: [customerEmail],
         reply_to: "infodaisy221@gmail.com",
         subject: `Order Confirmed - #${safeOrderId.slice(0, 8).toUpperCase()}`,
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        </head>
-        <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f9f5f3;">
-          <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
-            <div style="background: linear-gradient(135deg, #d4a5a5 0%, #c9a5a5 100%); padding: 40px 20px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 32px; font-weight: 300; letter-spacing: 2px;">DAISY</h1>
-              <p style="color: #ffffff; margin: 8px 0 0; font-size: 14px; opacity: 0.9;">Delicate Details, Distinctive</p>
-            </div>
-            
-            <div style="padding: 40px 30px;">
-              <div style="text-align: center; margin-bottom: 30px;">
-                <h2 style="color: #333; margin: 0 0 8px; font-size: 24px;">Thank You for Your Order!</h2>
-                <p style="color: #666; margin: 0;">Hi ${safeCustomerName}, your order has been confirmed.</p>
+        text: [
+          `Hi ${safeCustomerName}, your order has been confirmed.`,
+          `Order: #${safeOrderId.slice(0, 8).toUpperCase()}`,
+          `Total: PKR ${safeTotal.toLocaleString()}`,
+        ].join("\n"),
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f9f5f3;">
+            <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+              <div style="background: linear-gradient(135deg, #d4a5a5 0%, #c9a5a5 100%); padding: 40px 20px; text-align: center;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 32px; font-weight: 300; letter-spacing: 2px;">DAISY</h1>
+                <p style="color: #ffffff; margin: 8px 0 0; font-size: 14px; opacity: 0.9;">Delicate Details, Distinctive</p>
               </div>
               
-              <div style="background-color: #f9f5f3; padding: 20px; border-radius: 12px; margin-bottom: 24px;">
-                <p style="margin: 0 0 8px; font-size: 14px; color: #666;">Order Number</p>
-                <p style="margin: 0; font-size: 18px; font-weight: 600; color: #333; letter-spacing: 1px;">#${safeOrderId.slice(0, 8).toUpperCase()}</p>
+              <div style="padding: 40px 30px;">
+                <div style="text-align: center; margin-bottom: 30px;">
+                  <h2 style="color: #333; margin: 0 0 8px; font-size: 24px;">Thank You for Your Order!</h2>
+                  <p style="color: #666; margin: 0;">Hi ${safeCustomerName}, your order has been confirmed.</p>
+                </div>
+                
+                <div style="background-color: #f9f5f3; padding: 20px; border-radius: 12px; margin-bottom: 24px;">
+                  <p style="margin: 0 0 8px; font-size: 14px; color: #666;">Order Number</p>
+                  <p style="margin: 0; font-size: 18px; font-weight: 600; color: #333; letter-spacing: 1px;">#${safeOrderId.slice(0, 8).toUpperCase()}</p>
+                </div>
+                
+                <h3 style="color: #333; margin: 0 0 16px; font-size: 18px; border-bottom: 2px solid #d4a5a5; padding-bottom: 8px;">Order Details</h3>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+                  <thead>
+                    <tr style="background-color: #f9f5f3;">
+                      <th style="padding: 12px; text-align: left; font-weight: 600; color: #333;">Item</th>
+                      <th style="padding: 12px; text-align: center; font-weight: 600; color: #333;">Qty</th>
+                      <th style="padding: 12px; text-align: right; font-weight: 600; color: #333;">Price</th>
+                    </tr>
+                  </thead>
+                  <tbody>${itemsHtml}</tbody>
+                  <tfoot>
+                    <tr>
+                      <td colspan="2" style="padding: 12px; text-align: right; color: #666;">Subtotal</td>
+                      <td style="padding: 12px; text-align: right; font-weight: 600;">PKR ${safeSubtotal.toLocaleString()}</td>
+                    </tr>
+                    <tr>
+                      <td colspan="2" style="padding: 12px; text-align: right; color: #666;">Delivery</td>
+                      <td style="padding: 12px; text-align: right; font-weight: 600; ${safeShipping === 0 ? 'color: #22c55e;' : ''}">${safeShipping === 0 ? 'Free' : `PKR ${safeShipping.toLocaleString()}`}</td>
+                    </tr>
+                    <tr style="background-color: #f9f5f3;">
+                      <td colspan="2" style="padding: 16px 12px; text-align: right; font-weight: 600; font-size: 18px; color: #333;">Total</td>
+                      <td style="padding: 16px 12px; text-align: right; font-weight: 700; font-size: 20px; color: #d4a5a5;">PKR ${safeTotal.toLocaleString()}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+                
+                <div style="margin-bottom: 24px;">
+                  <h4 style="color: #333; margin: 0 0 12px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Shipping Address</h4>
+                  <p style="color: #666; margin: 0; line-height: 1.6;">
+                    ${safeAddress.firstName} ${safeAddress.lastName}<br>
+                    ${safeAddress.address}<br>
+                    ${safeAddress.city}, ${safeAddress.state} ${safeAddress.zip}<br>
+                    Phone: ${safeAddress.phone}
+                  </p>
+                </div>
+                
+                <div style="margin-bottom: 24px;">
+                  <h4 style="color: #333; margin: 0 0 12px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Payment Method</h4>
+                  <p style="color: #666; margin: 0;">${safePaymentMethod === 'cod' ? 'Cash on Delivery' : 'Credit/Debit Card'}</p>
+                </div>
+                
+                <div style="background-color: #f9f5f3; padding: 20px; border-radius: 12px; text-align: center;">
+                  <p style="color: #666; margin: 0 0 8px; font-size: 14px;">Questions about your order?</p>
+                  <p style="color: #333; margin: 0; font-weight: 600;">Contact us at support@daisy.pk</p>
+                </div>
               </div>
               
-              <h3 style="color: #333; margin: 0 0 16px; font-size: 18px; border-bottom: 2px solid #d4a5a5; padding-bottom: 8px;">Order Details</h3>
-              <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
-                <thead>
-                  <tr style="background-color: #f9f5f3;">
-                    <th style="padding: 12px; text-align: left; font-weight: 600; color: #333;">Item</th>
-                    <th style="padding: 12px; text-align: center; font-weight: 600; color: #333;">Qty</th>
-                    <th style="padding: 12px; text-align: right; font-weight: 600; color: #333;">Price</th>
-                  </tr>
-                </thead>
-                <tbody>${itemsHtml}</tbody>
-                <tfoot>
-                  <tr>
-                    <td colspan="2" style="padding: 12px; text-align: right; color: #666;">Subtotal</td>
-                    <td style="padding: 12px; text-align: right; font-weight: 600;">PKR ${safeSubtotal.toLocaleString()}</td>
-                  </tr>
-                  <tr>
-                    <td colspan="2" style="padding: 12px; text-align: right; color: #666;">Delivery</td>
-                    <td style="padding: 12px; text-align: right; font-weight: 600; ${safeShipping === 0 ? 'color: #22c55e;' : ''}">${safeShipping === 0 ? 'Free' : `PKR ${safeShipping.toLocaleString()}`}</td>
-                  </tr>
-                  <tr style="background-color: #f9f5f3;">
-                    <td colspan="2" style="padding: 16px 12px; text-align: right; font-weight: 600; font-size: 18px; color: #333;">Total</td>
-                    <td style="padding: 16px 12px; text-align: right; font-weight: 700; font-size: 20px; color: #d4a5a5;">PKR ${safeTotal.toLocaleString()}</td>
-                  </tr>
-                </tfoot>
-              </table>
-              
-              <div style="margin-bottom: 24px;">
-                <h4 style="color: #333; margin: 0 0 12px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Shipping Address</h4>
-                <p style="color: #666; margin: 0; line-height: 1.6;">
-                  ${safeAddress.firstName} ${safeAddress.lastName}<br>
-                  ${safeAddress.address}<br>
-                  ${safeAddress.city}, ${safeAddress.state} ${safeAddress.zip}<br>
-                  Phone: ${safeAddress.phone}
+              <div style="background-color: #1a1a2e; padding: 30px 20px; text-align: center;">
+                <p style="color: #d4a5a5; margin: 0 0 8px; font-size: 20px; letter-spacing: 2px; font-weight: 600;">DAISY</p>
+                <p style="color: #888; margin: 0 0 16px; font-size: 12px;">Delicate Details, Distinctive</p>
+                <p style="color: #666; margin: 0; font-size: 11px;">
+                  © 2025 DAISY. All rights reserved.
                 </p>
               </div>
-              
-              <div style="margin-bottom: 24px;">
-                <h4 style="color: #333; margin: 0 0 12px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Payment Method</h4>
-                <p style="color: #666; margin: 0;">${safePaymentMethod === 'cod' ? 'Cash on Delivery' : 'Credit/Debit Card'}</p>
-              </div>
-              
-              <div style="background-color: #f9f5f3; padding: 20px; border-radius: 12px; text-align: center;">
-                <p style="color: #666; margin: 0 0 8px; font-size: 14px;">Questions about your order?</p>
-                <p style="color: #333; margin: 0; font-weight: 600;">Contact us at support@daisy.pk</p>
-              </div>
             </div>
-            
-            <div style="background-color: #1a1a2e; padding: 30px 20px; text-align: center;">
-              <p style="color: #d4a5a5; margin: 0 0 8px; font-size: 20px; letter-spacing: 2px; font-weight: 600;">DAISY</p>
-              <p style="color: #888; margin: 0 0 16px; font-size: 12px;">Delicate Details, Distinctive</p>
-              <p style="color: #666; margin: 0; font-size: 11px;">
-                © 2025 DAISY. All rights reserved.
-              </p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `,
+          </body>
+          </html>
+        `,
       });
-      console.log("Customer email sent successfully:", JSON.stringify(emailResponse));
+
+      if (error) {
+        console.error("Customer email failed:", JSON.stringify(error));
+        throw new Error(`Customer email failed: ${error.message || 'Unknown Resend error'}`);
+      }
+
+      emailResponse = data;
+      console.log("Customer email sent successfully:", JSON.stringify(data));
     } catch (emailError: any) {
       console.error("Failed to send customer email:", emailError);
       console.error("Email error details:", JSON.stringify(emailError));
@@ -507,6 +530,21 @@ const handler = async (req: Request): Promise<Response> => {
     } catch (adminError) {
       // Log but don't fail if admin notification fails
       console.error("Failed to send admin notification:", adminError);
+    }
+
+    if (!emailResponse || !(emailResponse as any)?.id) {
+      console.error("Customer email was not sent (no email id returned)");
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Customer email was not sent",
+          hint: "This is usually caused by an invalid/expired RESEND_API_KEY or an unverified sending domain (FROM address).",
+        }),
+        {
+          status: 502,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
     }
 
     console.log("Order confirmation email sent successfully");
