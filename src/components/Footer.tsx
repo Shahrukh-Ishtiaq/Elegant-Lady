@@ -15,6 +15,10 @@ export const Footer = () => {
                 src={daisyLogo} 
                 alt="DAISY Logo" 
                 className="h-28 md:h-32 w-auto object-contain drop-shadow-lg"
+                loading="lazy"
+                decoding="async"
+                width={183}
+                height={128}
               />
             </div>
             <p className="text-sm text-muted-foreground max-w-xs">

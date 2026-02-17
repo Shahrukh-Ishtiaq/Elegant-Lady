@@ -176,6 +176,8 @@ export const Header = ({ cartItemCount }: HeaderProps) => {
                 src={daisyLogo}
                 alt="DAISY"
                 className="h-24 md:h-28 w-auto object-contain drop-shadow-lg hover:scale-105 transition-transform duration-300"
+                width={160}
+                height={112}
               />
             </Link>
           </div>

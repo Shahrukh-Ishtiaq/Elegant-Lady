@@ -214,6 +214,9 @@ const Home = () => {
               src={allHeroImages[currentHeroIndex]} 
               alt="DAISY Lingerie" 
               className="w-full h-full object-cover"
+              fetchPriority="high"
+              width={1920}
+              height={1008}
             />
           </motion.div>
         </AnimatePresence>
@@ -379,6 +382,10 @@ const Home = () => {
                     src={category.image_url} 
                     alt={category.name}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    loading="lazy"
+                    decoding="async"
+                    width={400}
+                    height={400}
                   />
                 ) : (
                   <div className="w-full h-full bg-accent flex items-center justify-center">
