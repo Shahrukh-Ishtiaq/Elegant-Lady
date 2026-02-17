@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable/index";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { PasswordInput } from "@/components/PasswordInput";
 
@@ -185,55 +186,21 @@ const Auth = () => {
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
-      // Use the production URL for redirect
-      const redirectUrl = `${window.location.origin}/auth`;
-      
-      console.log('Starting Google OAuth with redirect:', redirectUrl);
-      
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUrl,
-          skipBrowserRedirect: false,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'select_account',
-          }
-        }
+      const { error } = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+        extraParams: {
+          prompt: "select_account",
+        },
       });
-      
+
       if (error) {
         console.error('Google sign in error:', error);
-        
-        // Handle exchange code error specifically
-        if (error.message.includes('Unable to exchange') || error.message.includes('exchange external code')) {
-          toast.error(
-            "Google sign-in configuration issue. The admin needs to verify Google OAuth settings in the backend. Please use email/password for now.",
-            { duration: 6000 }
-          );
-        } else if (error.message.includes('provider is not enabled')) {
-          toast.error("Google sign-in is not enabled. Please use email/password.");
-        } else {
-          toast.error(error.message || "Failed to sign in with Google");
-        }
+        toast.error(error.message || "Failed to sign in with Google");
         setIsGoogleLoading(false);
-      } else if (data?.url) {
-        // Redirect to Google OAuth URL
-        console.log('Redirecting to Google OAuth...');
-        window.location.href = data.url;
       }
     } catch (error: any) {
       console.error('Google sign in error:', error);
-      
-      // Check if this is the exchange code error
-      if (error?.message?.includes('exchange') || error?.message?.includes('code')) {
-        toast.error(
-          "Google authentication failed. Please try again or use email/password.",
-          { duration: 5000 }
-        );
-      } else {
-        toast.error("Failed to sign in with Google. Please try again.");
-      }
+      toast.error("Failed to sign in with Google. Please try again.");
       setIsGoogleLoading(false);
     }
   };
