@@ -115,7 +115,7 @@ async function sendAdminNotification(
     console.log("Sending admin notification email to:", adminEmail);
 
     const { data, error } = await resend.emails.send({
-      from: "DAISY Orders <onboarding@resend.dev>",
+      from: "DAIZY Orders <orders@daisy.fit>",
       to: [adminEmail],
       reply_to: customerEmail,
       subject: `🛒 New Order #${safeOrderId.slice(0, 8).toUpperCase()} - PKR ${safeTotal.toLocaleString()}`,
@@ -403,10 +403,10 @@ const handler = async (req: Request): Promise<Response> => {
     let emailResponse: any = null;
     try {
       const { data, error } = await resend.emails.send({
-        from: "DAISY <onboarding@resend.dev>",
-        to: [customerEmail],
-        reply_to: "infodaisy221@gmail.com",
-        subject: `Order Confirmed - #${safeOrderId.slice(0, 8).toUpperCase()}`,
+      from: "DAIZY Orders <orders@daisy.fit>",
+      to: [customerEmail],
+      reply_to: "infodaisy221@gmail.com",
+      subject: `Order Confirmation – DAIZY | #${safeOrderId.slice(0, 8).toUpperCase()}`,
         text: [
           `Hi ${safeCustomerName}, your order has been confirmed.`,
           `Order: #${safeOrderId.slice(0, 8).toUpperCase()}`,
