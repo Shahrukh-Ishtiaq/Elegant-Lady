@@ -565,8 +565,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.error("Error stack:", error.stack);
     return new Response(
       JSON.stringify({ 
-        error: error.message || "Failed to send order confirmation email",
-        details: error.toString()
+        error: "Failed to send order confirmation email"
       }),
       {
         status: 500,
