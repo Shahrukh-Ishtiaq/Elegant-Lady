@@ -62,18 +62,36 @@ const ProductDetail = () => {
       if (data && !error) {
         setProduct(data as Product);
         
-        // Fetch related products (excluding frozen ones)
+        // Fetch related products from same category first
+        let relatedList: Product[] = [];
         if (data.category?.id) {
-          const { data: related } = await supabase
+          const { data: sameCategory } = await supabase
             .from('products')
             .select(`*, category:categories(id, name)`)
             .eq('category_id', data.category.id)
             .neq('id', id)
             .eq('is_frozen', false)
-            .limit(4);
+            .limit(8);
           
-          if (related) setRelatedProducts(related as Product[]);
+          if (sameCategory) relatedList = sameCategory as Product[];
         }
+
+        // If less than 8, fill with other products (any category)
+        if (relatedList.length < 8) {
+          const excludeIds = [id, ...relatedList.map(p => p.id)];
+          const needed = 8 - relatedList.length;
+          const { data: others } = await supabase
+            .from('products')
+            .select(`*, category:categories(id, name)`)
+            .not('id', 'in', `(${excludeIds.join(',')})`)
+            .eq('is_frozen', false)
+            .order('rating', { ascending: false })
+            .limit(needed);
+          
+          if (others) relatedList = [...relatedList, ...(others as Product[])];
+        }
+
+        setRelatedProducts(relatedList);
       }
       setLoading(false);
     };
@@ -415,42 +433,81 @@ const ProductDetail = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <h2 className="text-3xl font-bold mb-8">You May Also Like</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-3xl font-bold">You May Also Like</h2>
+                <p className="text-muted-foreground mt-1">Handpicked products just for you</p>
+              </div>
+              <Link to="/shop">
+                <Button variant="outline" size="sm">View All</Button>
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
               {relatedProducts.map((relatedProduct, idx) => (
                 <motion.div
                   key={relatedProduct.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 * idx }}
+                  transition={{ delay: 0.05 * idx }}
+                  whileHover={{ y: -4 }}
                 >
-                  <Card className="border-none shadow-soft hover:shadow-elegant transition-all">
-                    <Link to={`/product/${relatedProduct.id}`}>
-                      <div className="aspect-[3/4] overflow-hidden rounded-t-lg bg-muted">
+                  <Link to={`/product/${relatedProduct.id}`} className="block group">
+                    <Card className="border-none shadow-soft group-hover:shadow-elegant transition-all duration-300 overflow-hidden">
+                      <div className="relative aspect-[3/4] overflow-hidden bg-muted">
                         {relatedProduct.images && relatedProduct.images[0] ? (
                           <img 
                             src={relatedProduct.images[0]} 
                             alt={relatedProduct.name}
-                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            <span className="text-muted-foreground">No image</span>
+                            <span className="text-muted-foreground text-sm">No image</span>
+                          </div>
+                        )}
+                        {/* Hover overlay */}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
+                        {/* Badges */}
+                        <div className="absolute top-2 left-2 flex flex-col gap-1">
+                          {relatedProduct.discount_percentage && relatedProduct.discount_percentage > 0 && (
+                            <Badge className="bg-destructive text-destructive-foreground text-xs px-1.5 py-0.5">
+                              -{relatedProduct.discount_percentage}%
+                            </Badge>
+                          )}
+                          {relatedProduct.is_new && (
+                            <Badge className="bg-accent text-xs px-1.5 py-0.5">New</Badge>
+                          )}
+                        </div>
+                        {/* Category tag */}
+                        {relatedProduct.category?.name && (
+                          <div className="absolute bottom-2 left-2">
+                            <span className="bg-background/80 backdrop-blur-sm text-foreground text-xs px-2 py-0.5 rounded-full">
+                              {relatedProduct.category.name}
+                            </span>
                           </div>
                         )}
                       </div>
-                      <CardContent className="p-4">
-                        <h3 className="font-semibold mb-1">{relatedProduct.name}</h3>
-                        <div className="flex items-center gap-2 mb-1">
+                      <CardContent className="p-3 md:p-4">
+                        <h3 className="font-semibold text-sm md:text-base mb-1 line-clamp-1 group-hover:text-primary transition-colors">
+                          {relatedProduct.name}
+                        </h3>
+                        <div className="flex items-center gap-1.5 mb-2">
                           <StarRating rating={relatedProduct.rating || 0} size="sm" />
                           <span className="text-xs text-muted-foreground">({relatedProduct.review_count || 0})</span>
                         </div>
-                        <p className="text-lg font-bold text-primary">
-                          PKR {relatedProduct.price.toLocaleString()}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-base md:text-lg font-bold text-primary">
+                            PKR {relatedProduct.price.toLocaleString()}
+                          </p>
+                          {relatedProduct.original_price && relatedProduct.original_price > relatedProduct.price && (
+                            <p className="text-xs text-muted-foreground line-through">
+                              PKR {relatedProduct.original_price.toLocaleString()}
+                            </p>
+                          )}
+                        </div>
                       </CardContent>
-                    </Link>
-                  </Card>
+                    </Card>
+                  </Link>
                 </motion.div>
               ))}
             </div>
