@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,8 @@ const Home = () => {
   const [subscribeEmail, setSubscribeEmail] = useState("");
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
+  const [currentPromoIndex, setCurrentPromoIndex] = useState(0);
+  const promoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { scrollY } = useScroll();
   const heroY = useTransform(scrollY, [0, 500], [0, 150]);
   const heroOpacity = useTransform(scrollY, [0, 300], [1, 0.3]);
@@ -105,6 +107,19 @@ const Home = () => {
     return () => clearInterval(interval);
   }, [allHeroImages.length]);
 
+  // Auto-advance promo banner slides
+  useEffect(() => {
+    if (promotions.length <= 1) return;
+    
+    promoIntervalRef.current = setInterval(() => {
+      setCurrentPromoIndex(prev => (prev + 1) % promotions.length);
+    }, 4000);
+    
+    return () => {
+      if (promoIntervalRef.current) clearInterval(promoIntervalRef.current);
+    };
+  }, [promotions.length]);
+
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -139,7 +154,23 @@ const Home = () => {
     }
   };
 
-  const activePromo = promotions[0];
+  const activePromo = promotions[currentPromoIndex];
+
+  const nextPromoSlide = () => {
+    if (promoIntervalRef.current) clearInterval(promoIntervalRef.current);
+    setCurrentPromoIndex(prev => (prev + 1) % promotions.length);
+    promoIntervalRef.current = setInterval(() => {
+      setCurrentPromoIndex(prev => (prev + 1) % promotions.length);
+    }, 4000);
+  };
+
+  const prevPromoSlide = () => {
+    if (promoIntervalRef.current) clearInterval(promoIntervalRef.current);
+    setCurrentPromoIndex(prev => (prev - 1 + promotions.length) % promotions.length);
+    promoIntervalRef.current = setInterval(() => {
+      setCurrentPromoIndex(prev => (prev + 1) % promotions.length);
+    }, 4000);
+  };
 
   const nextSlide = useCallback(() => {
     setCurrentHeroIndex(prev => (prev + 1) % allHeroImages.length);
@@ -170,31 +201,89 @@ const Home = () => {
     <div className="min-h-screen bg-gradient-soft">
       <Header cartItemCount={cart.length} />
       
-      {/* Promo Banner */}
-      {activePromo && (
+      {/* Promo Banner - Slide-wise for multiple promotions */}
+      {promotions.length > 0 && activePromo && (
         <motion.div
           initial={{ y: -50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="bg-gradient-to-r from-primary to-accent text-primary-foreground py-3 relative overflow-hidden"
+          className="bg-gradient-to-r from-primary to-accent text-primary-foreground relative overflow-hidden"
         >
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(255,255,255,0.2),transparent)]" />
-          <motion.div 
-            className="container mx-auto px-4 flex items-center justify-center gap-3"
-            animate={{ scale: [1, 1.02, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            <Sparkles className="h-5 w-5 animate-pulse" />
-            <span className="font-semibold">{activePromo.title}</span>
-            <Badge variant="secondary" className="bg-background/20 text-primary-foreground animate-pulse">
-              {activePromo.badge_text}
-            </Badge>
-            <span className="hidden sm:inline">{activePromo.description}</span>
-            <Link to="/shop">
-              <Button size="sm" variant="secondary" className="ml-2">
-                Shop Now <ArrowRight className="ml-1 h-4 w-4" />
-              </Button>
-            </Link>
-          </motion.div>
+
+          <div className="relative flex items-center min-h-[48px]">
+            {/* Prev Arrow */}
+            {promotions.length > 1 && (
+              <button
+                onClick={prevPromoSlide}
+                className="shrink-0 px-3 py-3 hover:bg-background/10 transition-colors z-10"
+                aria-label="Previous promotion"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+            )}
+
+            {/* Sliding Content */}
+            <div className="flex-1 overflow-hidden py-2 px-2">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activePromo.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.35 }}
+                  className="flex flex-wrap items-center justify-center gap-2 text-sm"
+                >
+                  <Sparkles className="h-4 w-4 animate-pulse shrink-0" />
+                  <span className="font-semibold">{activePromo.title}</span>
+                  {activePromo.badge_text && (
+                    <Badge variant="secondary" className="bg-background/20 text-primary-foreground text-xs">
+                      {activePromo.badge_text}
+                    </Badge>
+                  )}
+                  {activePromo.description && (
+                    <span className="hidden sm:inline text-primary-foreground/90">{activePromo.description}</span>
+                  )}
+                  <Link to="/shop">
+                    <Button size="sm" variant="secondary" className="h-7 text-xs px-3">
+                      Shop Now <ArrowRight className="ml-1 h-3 w-3" />
+                    </Button>
+                  </Link>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {/* Next Arrow */}
+            {promotions.length > 1 && (
+              <button
+                onClick={nextPromoSlide}
+                className="shrink-0 px-3 py-3 hover:bg-background/10 transition-colors z-10"
+                aria-label="Next promotion"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            )}
+
+            {/* Dot indicators */}
+            {promotions.length > 1 && (
+              <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-1">
+                {promotions.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      if (promoIntervalRef.current) clearInterval(promoIntervalRef.current);
+                      setCurrentPromoIndex(idx);
+                      promoIntervalRef.current = setInterval(() => {
+                        setCurrentPromoIndex(prev => (prev + 1) % promotions.length);
+                      }, 4000);
+                    }}
+                    className={`rounded-full transition-all ${
+                      idx === currentPromoIndex ? 'bg-background/80 w-4 h-1.5' : 'bg-background/40 w-1.5 h-1.5'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </motion.div>
       )}
 
