@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const WHATSAPP_NUMBER = "923001234567"; // Replace with actual admin number
+const WHATSAPP_NUMBER = "923180224407";
 
 export const WhatsAppButton = () => {
   const [isOpen, setIsOpen] = useState(false);
