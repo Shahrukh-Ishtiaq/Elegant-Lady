@@ -170,8 +170,7 @@ const Contact = () => {
                   </div>
                   <div>
                     <h3 className="font-semibold mb-1">Email</h3>
-                    <p className="text-muted-foreground">support@daisy.pk</p>
-                    <p className="text-muted-foreground">sales@daisy.pk</p>
+                    <p className="text-muted-foreground">infodaisy221@gmail.com</p>
                   </div>
                 </motion.div>
 
