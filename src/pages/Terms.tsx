@@ -79,7 +79,7 @@ const Terms = () => {
 
           <div className="text-center text-muted-foreground text-sm">
             <p>Last updated: January 2025</p>
-            <p className="mt-2">For questions, contact us at support@daisy.pk</p>
+            <p className="mt-2">For questions, contact us at infodaisy221@gmail.com</p>
           </div>
         </div>
       </div>
