@@ -10,6 +10,7 @@ import { Footer } from "@/components/Footer";
 import { useCart } from "@/contexts/CartContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Sparkles, ArrowRight, Loader2, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import heroImage from "@/assets/hero-lingerie.jpg";
 
@@ -45,6 +46,7 @@ interface SiteSettings {
 const Home = () => {
   const { cart } = useCart();
   const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
@@ -65,6 +67,7 @@ const Home = () => {
       ]);
       
       if (categoriesRes.data) setCategories(categoriesRes.data);
+      setCategoriesLoading(false);
       if (promotionsRes.data) setPromotions(promotionsRes.data);
       if (productsRes.data) setFeaturedProducts(productsRes.data);
       if (settingsRes.data) {
@@ -372,44 +375,52 @@ const Home = () => {
         </motion.div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {categories.map((category, idx) => (
-            <motion.div
-              key={category.id}
-              variants={itemVariants}
-              custom={idx}
-              whileHover={{ scale: 1.03 }}
-              transition={{ duration: 0.2 }}
-            >
-              <Link 
-                to={`/shop?category=${category.name.toLowerCase()}`}
-                className="group relative overflow-hidden rounded-xl shadow-soft hover:shadow-elegant transition-all block aspect-square"
+          {categoriesLoading ? (
+            Array.from({ length: 4 }).map((_, idx) => (
+              <div key={idx} className="aspect-square rounded-xl overflow-hidden">
+                <Skeleton className="w-full h-full" />
+              </div>
+            ))
+          ) : (
+            categories.map((category, idx) => (
+              <motion.div
+                key={category.id}
+                variants={itemVariants}
+                custom={idx}
+                whileHover={{ scale: 1.03 }}
+                transition={{ duration: 0.2 }}
               >
-                {category.image_url ? (
-                  <img 
-                    src={category.image_url} 
-                    alt={category.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    loading="lazy"
-                    decoding="async"
-                    width={400}
-                    height={400}
-                  />
-                ) : (
-                  <div className="w-full h-full bg-accent flex items-center justify-center">
-                    <span className="text-4xl">👗</span>
+                <Link 
+                  to={`/shop?category=${category.name.toLowerCase()}`}
+                  className="group relative overflow-hidden rounded-xl shadow-soft hover:shadow-elegant transition-all block aspect-square"
+                >
+                  {category.image_url ? (
+                    <img 
+                      src={category.image_url} 
+                      alt={category.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      loading="eager"
+                      decoding="async"
+                      width={400}
+                      height={400}
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-accent flex items-center justify-center">
+                      <span className="text-4xl">👗</span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/20 to-transparent flex items-end">
+                    <div className="p-4 w-full">
+                      <h3 className="text-xl font-bold text-foreground">{category.name}</h3>
+                      {category.description && (
+                        <p className="text-sm text-muted-foreground line-clamp-1">{category.description}</p>
+                      )}
+                    </div>
                   </div>
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/20 to-transparent flex items-end">
-                  <div className="p-4 w-full">
-                    <h3 className="text-xl font-bold text-foreground">{category.name}</h3>
-                    {category.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-1">{category.description}</p>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            </motion.div>
-          ))}
+                </Link>
+              </motion.div>
+            ))
+          )}
         </div>
       </motion.section>
 
